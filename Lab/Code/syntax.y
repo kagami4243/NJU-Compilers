@@ -115,6 +115,7 @@ Exp : Exp ASSIGNOP Exp  { $$ = newTreeNode(NULL, $1, $1->pos, 0, "Exp"); $1->nex
     | INT               { $$ = newTreeNode(NULL, $1, $1->pos, 0, "Exp"); }
     | FLOAT             { $$ = newTreeNode(NULL, $1, $1->pos, 0, "Exp"); }
     | error RP          { ; }
+    | error RB          { ; }
     ;
 Args : Exp COMMA Args   { $$ = newTreeNode(NULL, $1, $1->pos, 0, "Args"); $1->next = $2; $2->next = $3; }
     | Exp               { $$ = newTreeNode(NULL, $1, $1->pos, 0, "Args"); }
