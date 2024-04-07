@@ -5,7 +5,6 @@
     #include "lex.yy.c"
     extern int isError, isPrint;
     void PrintTree(struct Tree* t, int num);
-    void SetRoot(struct Tree* t);
 %}
 %union{
     struct Tree* type_Tree;
@@ -30,7 +29,9 @@
 %nonassoc ELSE
 
 %%
-Program : ExtDefList    { $$ = newTreeNode(NULL, $1, $1->pos, 0, "Program"); root = $$;if(isPrint) PrintTree(root,0); }
+Program : ExtDefList    { $$ = newTreeNode(NULL, $1, $1->pos, 0, "Program"); root = $$; 
+                            //PrintTree(root,0);
+                        }
     ;
 ExtDefList : ExtDef ExtDefList  { $$ = newTreeNode(NULL, $1, $1->pos, 0, "ExtDefList"); $1->next = $2; }
     | /* empty */               { $$ = newTreeNode(NULL, NULL, 0, 6, "ExtDefList"); }
@@ -153,13 +154,13 @@ void PrintTree(struct Tree* t, int num){
     if(t->type!=6)
         while(cpy_num--) printf(" "); 
     switch(t->type){
-        case 0: printf("%s (%d)\n",t->V.v_string,t->pos); break;
-        case 1: printf("INT: %d\n",t->V.v_int); break;
-        case 2: printf("FLOAT: %f\n",t->V.v_float); break;
-        case 3: printf("%s\n",t->V.v_string); break;
-        case 4: printf("ID: %s\n",t->V.v_string); break;
-        case 5: printf("TYPE: %s\n",t->V.v_string); break;
-        case 6: break;
+        case 0: printf("%s (%d)\n",t->V.v_string,t->pos); break; // no-token
+        case 1: printf("INT: %d\n",t->V.v_int); break; // INT
+        case 2: printf("FLOAT: %f\n",t->V.v_float); break; // FLOAT
+        case 3: printf("%s\n",t->V.v_string); break; // other token
+        case 4: printf("ID: %s\n",t->V.v_string); break; // ID
+        case 5: printf("TYPE: %s\n",t->V.v_string); break; // TYPE
+        case 6: break; // empty
         default: break;
     };
     PrintTree(t->children,num+2);

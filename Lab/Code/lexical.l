@@ -3,6 +3,7 @@
     #include <stdlib.h>
     #include <stdio.h>
     #include <string.h>
+    #include "ast.h"
     #include "syntax.tab.h"
     int yycolumn = 1;
     #define YY_USER_ACTION \
@@ -10,24 +11,8 @@
     yylloc.first_column = yycolumn; \
     yylloc.last_column = yycolumn + yyleng - 1; \
     yycolumn += yyleng;
-
-    union Value{
-        int v_int;
-        float v_float;
-        char* v_string;
-    };
-    struct Tree
-    {   
-        int type;
-        union Value V;
-        int pos;
-        struct Tree* children;
-        struct Tree* next;
-    };
     void Print_A_Error();
     int isError = 0, isPrint = 1;
-    struct Tree* root;
-    struct Tree* newTreeNode(struct Tree* next, struct Tree* children, int pos, int type, char* value);
 %}
 %option yylineno
 
@@ -114,7 +99,7 @@ struct Tree* newTreeNode(struct Tree* next, struct Tree* children, int pos, int 
     t->pos=pos;
     t->type=type;
     switch(type){
-        case 0: case 3: case 4: case 5:
+        case 0: case 3: case 4: case 5: case 6:
                 t->V.v_string=strdup(value); break;
         case 1: t->V.v_int=atoi(value); break;
         case 2: t->V.v_float=atof(value); break;
