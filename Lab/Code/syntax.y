@@ -119,9 +119,9 @@ Exp : Exp ASSIGNOP Exp  { $$ = newTreeNode(NULL, $1, $1->pos, 0, "Exp"); $1->nex
     | NOT Exp           { $$ = newTreeNode(NULL, $1, $1->pos, 0, "Exp"); $1->next = $2; }
     | ID LP Args RP     { $$ = newTreeNode(NULL, $1, $1->pos, 0, "Exp"); $1->next = $2; $2->next = $3; $3->next = $4; }
     | ID LP RP          { $$ = newTreeNode(NULL, $1, $1->pos, 0, "Exp"); $1->next = $2; $2->next = $3; }
-    | Exp LB Exp RB     { $$ = newTreeNode(NULL, $1, $1->pos, 0, "Exp"); $1->next = $2; $2->next = $3; $3->next = $4; }
-    | Exp DOT ID        { $$ = newTreeNode(NULL, $1, $1->pos, 0, "Exp"); $1->next = $2; $2->next = $3; }
-    | ID                { $$ = newTreeNode(NULL, $1, $1->pos, 0, "Exp"); }
+    | Exp LB Exp RB     { $$ = newTreeNode(NULL, $1, $1->pos, 0, "Exp"); $1->next = $2; $2->next = $3; $3->next = $4; $$->leftValue = 1; }
+    | Exp DOT ID        { $$ = newTreeNode(NULL, $1, $1->pos, 0, "Exp"); $1->next = $2; $2->next = $3; $$->leftValue = 1; }
+    | ID                { $$ = newTreeNode(NULL, $1, $1->pos, 0, "Exp"); $$->leftValue = 1; }
     | INT               { $$ = newTreeNode(NULL, $1, $1->pos, 0, "Exp"); }
     | FLOAT             { $$ = newTreeNode(NULL, $1, $1->pos, 0, "Exp"); }
 
@@ -148,7 +148,6 @@ yyerror(char* msg){
 }
 
 void PrintTree(struct Tree* t, int num){
-    
     if(t==NULL) return ;
     int cpy_num = num;
     if(t->type!=6)

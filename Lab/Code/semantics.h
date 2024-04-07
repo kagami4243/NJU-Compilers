@@ -1,14 +1,16 @@
 #include "ast.h"
 
-int StructTableUni=0;
+int StructTableUni=0; // for anonymous struct
 typedef struct Type_* Type;
 typedef struct FieldList_* FieldList;
+
+/*symbol table item*/
 struct symbol{
     int type; // 0->var, 1->func
     union{
-        Type var;
-        struct Func* func;
-    } val;
+        Type var; // var's type
+        struct Func* func; // store func info
+    } val; // item value
     struct symbol* next;
     char name[40];
 };
@@ -43,21 +45,46 @@ struct FieldList_
     FieldList tail; // 下一个域
 };
 
+/*store struct info*/
 struct TypeTable{
-    char name[40];
-    FieldList t;
+    char name[40]; 
+    FieldList t; // struct content
     struct TypeTable*next;
 };
 
+/*num: error type, pos: error pos*/
+void PrintErrorNum(int num, int pos);
+
+/*basic: type name*/
+Type genBasicType(char* basic);
+
 void initSymbol();
 
-/*type: 0->var, 1->func*/
-struct symbol* findSymbolWithName(char* name, int type);
+void initStruct();
 
-struct TypeTable* findStructWithName(char*name);
+/*name: var name, type:0->var, type_name: type name*/
+void addVar2Symbol(char*name, int type,char* type_name);
 
-int Compare2Type(Type t1,Type t2);
+/*node: vardec array node, type:0->var, type_name: type name*/
+char* addArray2Symbol(struct Tree*node,int type,char*type_name);
 
+/*node: vardec array node, type_name: type name*/
 Type genArrayType(struct Tree*node,char*type_name);
 
+/*name: func name, type: 1->func, return_type: return value type, param_type: params type*/
+void addFunc2Symbol(char*name, int type,Type return_type,int param_num,Type* param_type);
+
+/*name: var or func name, type: 0->var, 1->func*/
+struct symbol* findSymbolWithName(char* name, int type);
+
+/*compare 2 types, 1->true, 0->false*/
+int Compare2Type(Type t1,Type t2);
+
+/*structspecifier: StructSpecifier node, StructSpecifier->STRUCT OptTag LC DefList RC*/
+char* add2StructTable(struct Tree*structspecifier);
+
+/*name: struct name*/
+struct TypeTable* findStructWithName(char*name);
+
+/*main function for semantic analysis*/
 void do_semantics(struct Tree* node);

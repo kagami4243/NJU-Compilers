@@ -6,13 +6,20 @@
 struct symbol* symbolTable;
 struct TypeTable* structTable;
 
-static int error_pos=-1;
+static int error_pos=-1; // avoid duplicate error messages
 
 void PrintErrorNum(int num, int pos){
     if(error_pos!=pos){
         printf("Error type %d at Line %d: \n",num, pos);
         error_pos=pos;
     }
+}
+
+Type genBasicType(char* basic){
+    Type t=(Type)malloc(sizeof(struct Type_));
+    t->kind=BASIC;
+    strcpy(t->u.basic,basic);
+    return t;
 }
 
 void initSymbol(){
@@ -52,11 +59,13 @@ char* addArray2Symbol(struct Tree*node,int type,char*type_name){
         }
         node=node->children;
     }
-    Type t=(Type)malloc(sizeof(struct Type_));
-    t->kind=BASIC;
-    strcpy(t->u.basic,type_name);
-    tail->u.array.elem=t;
-    tail=t;
+    {
+        Type t=(Type)malloc(sizeof(struct Type_));
+        t->kind=BASIC;
+        strcpy(t->u.basic,type_name);
+        tail->u.array.elem=t;
+        tail=t;
+    }
     struct symbol* s=(struct symbol*)malloc(sizeof(struct symbol));
     s->next=symbolTable->next;
     symbolTable->next=s;
@@ -82,11 +91,13 @@ Type genArrayType(struct Tree*node,char*type_name){
         }
         node=node->children;
     }
-    Type t=(Type)malloc(sizeof(struct Type_));
-    t->kind=BASIC;
-    strcpy(t->u.basic,type_name);
-    tail->u.array.elem=t;
-    tail=t;
+    {
+        Type t=(Type)malloc(sizeof(struct Type_));
+        t->kind=BASIC;
+        strcpy(t->u.basic,type_name);
+        tail->u.array.elem=t;
+        tail=t;
+    }
     return head;
 }
 
@@ -118,12 +129,9 @@ struct symbol* findSymbolWithName(char* name, int type){
 }
 
 int Compare2Type(Type t1,Type t2){
-    if(t1==NULL && t2==NULL) return 1;
     if(t1==NULL || t2==NULL) return 0;
-    //printf("%d %d\n",t1->kind,t2->kind);
     if(t1->kind!=t2->kind) return 0;
     if(t1->kind==BASIC){
-        //printf("BASIC: %s %s\n",t1->u.basic,t2->u.basic);
         if(strcmp(t1->u.basic,"int")==0 || strcmp(t1->u.basic,"float")==0
             || strcmp(t2->u.basic,"int")==0 || strcmp(t2->u.basic,"float")==0){
             if(strcmp(t1->u.basic,t2->u.basic)!=0){
@@ -132,7 +140,7 @@ int Compare2Type(Type t1,Type t2){
         }
         else if(strcmp(t1->u.basic,t2->u.basic)!=0){
             struct TypeTable*tt1=findStructWithName(t1->u.basic),*tt2=findStructWithName(t2->u.basic);
-            FieldList f1=tt1->t->tail,f2=tt2->t->tail;
+            FieldList f1=tt1->t,f2=tt2->t;
             while(f1!=NULL && f2!=NULL){
                 if(!Compare2Type(f1->type,f2->type))
                     return 0;
@@ -142,7 +150,6 @@ int Compare2Type(Type t1,Type t2){
         }
     }   
     else if(t1->kind==ARRAY){
-        //printf("ARRAY: \n");
         t1=t1->u.array.elem;
         t2=t2->u.array.elem;
         return Compare2Type(t1,t2);
@@ -150,27 +157,28 @@ int Compare2Type(Type t1,Type t2){
     return 1;
 }
 
-char* add2StructTable(struct Tree*node){
-    struct Tree*tag=node->children->next;
+char* add2StructTable(struct Tree*structspecifier){
+    // StructSpecifier->STRUCT OptTag LC DefList RC
+    struct Tree*tag=structspecifier->children->next;
     char* Tag;
     Tag=(char*)malloc(sizeof(char)*40);
     if(tag->type!=6){
-        strcpy(Tag,node->children->next->children->V.v_string);
+        strcpy(Tag,tag->children->V.v_string);
     }
     else{
         sprintf(Tag,"%d",StructTableUni++);
     }
     if((findSymbolWithName(Tag,0)!=NULL) || (findStructWithName(Tag)!=NULL)){
-        PrintErrorNum(16,node->pos);
+        PrintErrorNum(16,tag->pos);
+        return tag;
     }
-    node=node->children->next->next->next; // node->DefList
+    struct Tree* deflist=tag->next->next;
     FieldList t=(FieldList)malloc(sizeof(struct FieldList_));
     t->tail=NULL;
     FieldList tail=t;
-    while(node->type!=6){
-        node=node->children; // node->Def
-        do_semantics(node->children);
-        struct Tree*declist=node->children->next;
+    while(deflist->type!=6){
+        struct Tree* def=deflist->children, *specifier=def->children, *declist=specifier->next;
+        do_semantics(specifier);
         while(declist->children->next!=NULL){
             struct Tree*vardec=declist->children->children;
             FieldList field=(FieldList)malloc(sizeof(struct FieldList_));
@@ -179,24 +187,26 @@ char* add2StructTable(struct Tree*node){
             char name[40];
             if(vardec->children->next==NULL){
                 unit->kind=BASIC;
-                strcpy(unit->u.basic,node->children->specifier);
+                strcpy(unit->u.basic,specifier->specifier);
                 strcpy(name,vardec->children->V.v_string);
-                if(findSymbolWithName(vardec->children->V.v_string,0)!=NULL){
+                if(findSymbolWithName(vardec->children->V.v_string,0)!=NULL
+                    || findStructWithName(vardec->children->V.v_string)!=NULL){
                     PrintErrorNum(15,vardec->children->pos);
                 }
                 else 
-                    addVar2Symbol(vardec->children->V.v_string,0,node->children->specifier);
+                    addVar2Symbol(vardec->children->V.v_string,0,specifier->specifier);
             }
             else{
                 unit->kind=ARRAY;
-                unit->u.array=genArrayType(vardec,node->children->specifier)->u.array;
-                struct Tree* r=vardec;
-                while(r->children->next!=NULL) r=r->children;
-                if(findSymbolWithName(r->children->V.v_string,0)!=NULL){
-                    PrintErrorNum(15,vardec->children->pos);
+                unit->u.array=genArrayType(vardec,specifier->specifier)->u.array;
+                struct Tree* v=vardec;
+                while(v->children->next!=NULL) v=v->children;
+                if(findSymbolWithName(v->children->V.v_string,0)!=NULL
+                    || findStructWithName(v->children->V.v_string)!=NULL){
+                    PrintErrorNum(15,v->children->pos);
                 }
                 else 
-                    strcpy(name,addArray2Symbol(vardec,0,node->children->specifier));
+                    strcpy(name,addArray2Symbol(vardec,0,specifier->specifier));
             }
             field->type=unit;
             strcpy(field->name,name);
@@ -209,45 +219,48 @@ char* add2StructTable(struct Tree*node){
             declist=declist->children->next->next;
         }
         {struct Tree*vardec=declist->children->children;
-        FieldList field=(FieldList)malloc(sizeof(struct FieldList_));
-        field->tail=NULL;
-        Type unit=(Type)malloc(sizeof(struct Type_));
-        char name[40];
-        if(vardec->children->next==NULL){
-            unit->kind=BASIC;
-            strcpy(unit->u.basic,node->children->specifier);
-            strcpy(name,vardec->children->V.v_string);
-            if(findSymbolWithName(vardec->children->V.v_string,0)!=NULL){
-                PrintErrorNum(15,vardec->children->pos);
+            FieldList field=(FieldList)malloc(sizeof(struct FieldList_));
+            field->tail=NULL;
+            Type unit=(Type)malloc(sizeof(struct Type_));
+            char name[40];
+            if(vardec->children->next==NULL){
+                unit->kind=BASIC;
+                strcpy(unit->u.basic,specifier->specifier);
+                strcpy(name,vardec->children->V.v_string);
+                if(findSymbolWithName(vardec->children->V.v_string,0)!=NULL
+                    || findStructWithName(vardec->children->V.v_string)!=NULL){
+                    PrintErrorNum(15,vardec->children->pos);
+                }
+                else 
+                    addVar2Symbol(vardec->children->V.v_string,0,specifier->specifier);
             }
-            else 
-                addVar2Symbol(vardec->children->V.v_string,0,node->children->specifier);
-        }
-        else{
-            unit->kind=ARRAY;
-            unit->u.array=genArrayType(vardec,node->children->specifier)->u.array;
-            struct Tree* r=vardec;
-            while(r->children->next!=NULL) r=r->children;
-            if(findSymbolWithName(r->children->V.v_string,0)!=NULL){
-                PrintErrorNum(15,vardec->children->pos);
+            else{
+                unit->kind=ARRAY;
+                unit->u.array=genArrayType(vardec,specifier->specifier)->u.array;
+                struct Tree* v=vardec;
+                while(v->children->next!=NULL) v=v->children;
+                if(findSymbolWithName(v->children->V.v_string,0)!=NULL
+                    || findStructWithName(v->children->V.v_string)!=NULL){
+                    PrintErrorNum(15,v->children->pos);
+                }
+                else 
+                    strcpy(name,addArray2Symbol(vardec,0,specifier->specifier));
             }
-            else 
-                strcpy(name,addArray2Symbol(vardec,0,node->children->specifier));
+            field->type=unit;
+            strcpy(field->name,name);
+            tail->tail=field;
+            tail=field;
+            vardec->exp_type=unit;
+            if(vardec->next!=NULL){
+                PrintErrorNum(15,vardec->pos);
+            }
+            declist=declist->children->next->next;
         }
-        field->type=unit;
-        strcpy(field->name,name);
-        tail->tail=field;
-        tail=field;
-        vardec->exp_type=unit;
-        if(vardec->next!=NULL){
-            PrintErrorNum(15,node->pos);
-        }
-        }
-        node=node->next;
+        deflist=def->next;
     }
     struct TypeTable* tt=(struct TypeTable*)malloc(sizeof(struct TypeTable));
     strcpy(tt->name,Tag);
-    tt->t=t;
+    tt->t=t->tail;
     tt->next=structTable->next;
     structTable->next=tt;
     return Tag;
@@ -268,7 +281,9 @@ void do_semantics(struct Tree* node){
     if(node==NULL || node->type==6) return;
     // printf("%d\n",node->type);
     // if(node->type==0 || node->type==3 || node->type==5) printf("%s\n",node->V.v_string);
-    // if(node->type==1) printf("%d\n",node->V.v_int);
+    // if(node->type==1) printf("INT: %d\n",node->V.v_int);
+    // if(node->type==2) printf("FLOAT: %f\n",node->V.v_float);
+    // if(node->type==4) printf("ID: %s\n",node->V.v_string);
     switch (node->type)
     {
     case 0:{
@@ -277,183 +292,157 @@ void do_semantics(struct Tree* node){
                 switch(node->children->type){
                     case 1:{
                         // Exp->INT
-                        Type t=(Type)malloc(sizeof(struct Type_));
-                        t->kind=BASIC;
-                        strcpy(t->u.basic,"int");
-                        node->exp_type=t; 
-                        node->leftValue=0;
+                        node->exp_type=genBasicType("int"); 
                         break;
                     }
                     case 2:{
                         // Exp->FLOAT
-                        Type t=(Type)malloc(sizeof(struct Type_));
-                        t->kind=BASIC;
-                        strcpy(t->u.basic,"float");
-                        node->exp_type=t;
-                        node->leftValue=0;
+                        node->exp_type=genBasicType("float"); 
                         break;
                     }
                     case 4:{
                         // Exp->ID
-                        struct symbol* s=findSymbolWithName(node->children->V.v_string,0);
+                        struct Tree* id=node->children;
+                        struct symbol* s=findSymbolWithName(id->V.v_string,0);
                         if(s==NULL){
                             PrintErrorNum(1,node->pos);
-                            Type t=(Type)malloc(sizeof(struct Type_));
-                            t->kind=BASIC;
-                            strcpy(t->u.basic,"int");
-                            node->exp_type=t; 
-                            node->leftValue=1;
+                            node->exp_type=genBasicType("int"); 
                             break;
                         } 
                         node->exp_type=s->val.var;
-                        node->leftValue=1;
                         break;
                     }
                     default: break;
                 }
             }
             else if(node->children->next->next==NULL){
-                struct Tree* t=node->children->next;
+                struct Tree* exp1=node->children->next;
                 if(strcmp(node->children->V.v_string,"MINUS")==0){
                     // Exp->MINUS Exp
-                    do_semantics(t);
-                    node->leftValue=0;
-                    node->exp_type=t->exp_type;
-                    if(t->exp_type->kind!=BASIC ||
-                     (strcmp(t->exp_type->u.basic,"int")!=0 && strcmp(t->exp_type->u.basic,"float")!=0)){
+                    do_semantics(exp1);
+                    if(exp1->exp_type->kind!=BASIC ||
+                     (strcmp(exp1->exp_type->u.basic,"int")!=0 && strcmp(exp1->exp_type->u.basic,"float")!=0)){
                         PrintErrorNum(1,node->pos);
+                        node->exp_type=genBasicType("int");
                         break;
                     }
+                    node->exp_type=exp1->exp_type;
                 }
                 else{
                     // Exp->NOT Exp
-                    do_semantics(t);
-                    node->leftValue=0;
-                    node->exp_type=t->exp_type;
-                    if(t->exp_type->kind!=BASIC || strcmp(t->exp_type->u.basic,"int")!=0){
+                    do_semantics(exp1);
+                    if(exp1->exp_type->kind!=BASIC || strcmp(exp1->exp_type->u.basic,"int")!=0){
                         PrintErrorNum(1,node->pos);
+                        node->exp_type=genBasicType("int");
                         break;
                     }
+                    node->exp_type=exp1->exp_type;
                 }
             }
             else if(node->children->next->next->next==NULL){
-                char* s=node->children->next->V.v_string;
-                if(strcmp(s,"AND")==0 || strcmp(s,"OR")==0){
+                char* op=node->children->next->V.v_string;
+                if(strcmp(op,"AND")==0 || strcmp(op,"OR")==0){
                     // Exp->Exp AND Exp
                     // Exp->Exp OR Exp
-                    do_semantics(node->children);
-                    do_semantics(node->children->next->next);
-                    node->leftValue=0;
-                    Type t=(Type)malloc(sizeof(struct Type_));
-                    t->kind=BASIC;
-                    strcpy(t->u.basic,"int");
-                    node->exp_type=t;
-                    if(node->children->exp_type->kind!=BASIC || node->children->next->next->exp_type->kind!=BASIC){
-                        PrintErrorNum(7,node->pos);
-                        break;
-                    }
-                    if(strcmp(node->children->exp_type->u.basic,"int")!=0 || strcmp(node->children->next->next->exp_type->u.basic,"int")!=0){
+                    struct Tree* exp1=node->children;
+                    struct Tree* exp2=node->children->next->next;
+                    do_semantics(exp1);
+                    do_semantics(exp2);
+                    node->exp_type=genBasicType("int");
+                    if(exp1->exp_type->kind!=BASIC || exp2->exp_type->kind!=BASIC ||
+                    strcmp(exp1->exp_type->u.basic,"int")!=0 || strcmp(exp2->exp_type->u.basic,"int")!=0){
                         PrintErrorNum(7,node->pos);
                         break;
                     }
                 }
-                else if(strcmp(s,"ASSIGNOP")==0){
+                else if(strcmp(op,"ASSIGNOP")==0){
                     // Exp->Exp ASSIGNOP Exp
-                    do_semantics(node->children);
-                    do_semantics(node->children->next->next);
-                    node->leftValue=0;
-                    node->exp_type=node->children->exp_type;
-                    if(!Compare2Type(node->children->exp_type,node->children->next->next->exp_type)){
+                    struct Tree* exp1=node->children;
+                    struct Tree* exp2=node->children->next->next;
+                    do_semantics(exp1);
+                    do_semantics(exp2);
+                    node->exp_type=exp1->exp_type;
+                    if(!Compare2Type(exp1->exp_type,exp2->exp_type)){
                         PrintErrorNum(5,node->pos);
                         break;
                     }
-                    if(node->children->leftValue==0){
+                    if(exp1->leftValue==0){
                         PrintErrorNum(6,node->pos);
                         break;
                     }
                 }
-                else if(strcmp(s,"PLUS")==0 || strcmp(s,"MINUS")==0 || strcmp(s,"RELOP")==0
-                        || strcmp(s,"STAR")==0 || strcmp(s,"DIV")==0){
+                else if(strcmp(op,"PLUS")==0 || strcmp(op,"MINUS")==0 || strcmp(op,"RELOP")==0
+                        || strcmp(op,"STAR")==0 || strcmp(op,"DIV")==0){
                     // Exp->Exp RELOP Exp
                     // Exp->Exp PLUS Exp
                     // Exp->Exp MINUS Exp
                     // Exp->Exp STAR Exp
                     // Exp->Exp DIV Exp
-                    do_semantics(node->children);
-                    do_semantics(node->children->next->next);
-                    node->leftValue=0;
-                    Type t=(Type)malloc(sizeof(struct Type_));
-                    t->kind=BASIC;
-                    strcpy(t->u.basic,"int");
-                    if(node->children->exp_type->kind!=BASIC || node->children->next->next->exp_type->kind!=BASIC){
+                    struct Tree* exp1=node->children;
+                    struct Tree* exp2=node->children->next->next;
+                    do_semantics(exp1);
+                    do_semantics(exp2);
+                    if(exp1->exp_type->kind!=BASIC || exp2->exp_type->kind!=BASIC
+                        || strcmp(exp1->exp_type->u.basic,exp2->exp_type->u.basic)!=0){
                         PrintErrorNum(7,node->pos);
-                        node->exp_type=t;
+                        node->exp_type=genBasicType("int");
                         break;
                     }
-                    if(strcmp(node->children->exp_type->u.basic,node->children->next->next->exp_type->u.basic)!=0){
+                    if(strcmp(exp1->exp_type->u.basic,"int")!=0 && strcmp(exp1->exp_type->u.basic,"float")!=0){
                         PrintErrorNum(7,node->pos);
-                        node->exp_type=t;
+                        node->exp_type=genBasicType("int");
                         break;
                     }
-                    if(strcmp(node->children->exp_type->u.basic,"int")!=0 && strcmp(node->children->exp_type->u.basic,"float")!=0){
-                        PrintErrorNum(7,node->pos);
-                        node->exp_type=t;
-                        break;
-                    }
-                    if(strcmp(s,"RELOP")==0){
-                        node->exp_type=t;
+                    if(strcmp(op,"RELOP")==0){
+                        node->exp_type=genBasicType("int");
                     }
                     else 
-                        node->exp_type=node->children->exp_type;
+                        node->exp_type=exp1->exp_type;
                 }
-                else if(strcmp(s,"Exp")==0){
+                else if(strcmp(op,"Exp")==0){
                     // Exp->LP Exp RP
-                    do_semantics(node->children->next);
-                    node->leftValue=0;
-                    node->exp_type=node->children->next->exp_type;
+                    struct Tree* exp1=node->children->next;
+                    do_semantics(exp1);
+                    node->exp_type=exp1->exp_type;
                 }
-                else if(strcmp(s,"LP")==0){
+                else if(strcmp(op,"LP")==0){
                     // Exp->ID LP RP
-                    struct symbol* s=findSymbolWithName(node->children->V.v_string,1);
-                    if(findSymbolWithName(node->children->V.v_string,0)!=NULL){
+                    struct Tree* id=node->children;
+                    struct symbol* s=findSymbolWithName(id->V.v_string,1);
+                    if(findSymbolWithName(id->V.v_string,0)!=NULL){
                         PrintErrorNum(11,node->pos);
+                        node->exp_type=genBasicType("int");
                         break;
                     }
                     if(s==NULL){
                         PrintErrorNum(7,node->pos);
+                        node->exp_type=genBasicType("int");
                         break;
                     }
                     if(s->val.func->param_num!=0){
-                        PrintErrorNum(7,node->pos);
-                        break;
+                        PrintErrorNum(9,node->pos);
                     }
                     node->exp_type=s->val.func->return_type;
                 }
                 else{
                     // Exp->Exp DOT ID
-                    do_semantics(node->children);
-                    node->leftValue=1;
-                    struct TypeTable* s=findStructWithName(node->children->exp_type->u.basic);
+                    struct Tree* exp1=node->children,*id=node->children->next->next;
+                    do_semantics(exp1);
+                    struct TypeTable* s=findStructWithName(exp1->exp_type->u.basic);
                     if(s==NULL){
                         PrintErrorNum(13,node->pos);
-                        Type t=(Type)malloc(sizeof(struct Type_));
-                        t->kind=BASIC;
-                        strcpy(t->u.basic,"int");
-                        node->exp_type=t;
+                        node->exp_type=genBasicType("int");
                         break;
                     }
-                    FieldList f=s->t->tail;
+                    FieldList f=s->t;
                     while(f!=NULL){
-                        if(strcmp(f->name,node->children->next->next->V.v_string)==0)
+                        if(strcmp(f->name,id->V.v_string)==0)
                             break;
                         f=f->tail;
                     }
                     if(f==NULL){
                         PrintErrorNum(14,node->pos);
-                        Type t=(Type)malloc(sizeof(struct Type_));
-                        t->kind=BASIC;
-                        strcpy(t->u.basic,"int");
-                        node->exp_type=t;
+                        node->exp_type=genBasicType("int");
                         break;
                     }
                     node->exp_type=f->type;
@@ -462,45 +451,39 @@ void do_semantics(struct Tree* node){
             else if(node->children->next->next->next->next==NULL){
                 if(strcmp(node->children->next->V.v_string,"LP")==0){
                     // Exp->ID LP Args RP
-                    struct symbol*s=findSymbolWithName(node->children->V.v_string,1);
-                    if(findSymbolWithName(node->children->V.v_string,0)!=NULL){
+                    struct Tree* id=node->children,*args=node->children->next->next;
+                    struct symbol*s=findSymbolWithName(id->V.v_string,1);
+                    if(findSymbolWithName(id->V.v_string,0)!=NULL){
                         PrintErrorNum(11,node->pos);
-                        Type t=(Type)malloc(sizeof(struct Type_));
-                        t->kind=BASIC;
-                        strcpy(t->u.basic,"int");
-                        node->exp_type=t;
+                        node->exp_type=genBasicType("int");
                         break;
                     }
                     if(s==NULL){
                         PrintErrorNum(2,node->pos);
-                        Type t=(Type)malloc(sizeof(struct Type_));
-                        t->kind=BASIC;
-                        strcpy(t->u.basic,"int");
-                        node->exp_type=t;
+                        node->exp_type=genBasicType("int");
                         break;
                     }
                     node->exp_type=s->val.func->return_type;
-                    struct Tree* cur=node->children->next->next;//cur->Args
                     int index=0;
                     int error=0;
-                    while(cur->children->next!=NULL){
-                        do_semantics(cur->children);
-                        if(!Compare2Type(cur->children->exp_type,s->val.func->param_type[index])){
+                    while(args->children->next!=NULL){
+                        // Args->Exp COMMA Args
+                        struct Tree* exp=args->children;
+                        do_semantics(exp);
+                        if(!Compare2Type(exp->exp_type,s->val.func->param_type[index])){
                             PrintErrorNum(9,node->pos);
                             error=1;
                             break;
                         }
-                        cur=cur->children->next->next;
+                        args=args->children->next->next;
                         ++index;
                     }
+                    // Args->Exp
                     if(error!=1){
-                        do_semantics(cur->children);
-                        if(!Compare2Type(cur->children->exp_type,s->val.func->param_type[index])){
-                            PrintErrorNum(9,node->pos);
-                            break;
-                        }
-                        ++index;
-                        if(index!=s->val.func->param_num){
+                        struct Tree* exp=args->children;
+                        do_semantics(exp);
+                        if(!Compare2Type(exp->exp_type,s->val.func->param_type[index])
+                            || index!=s->val.func->param_num-1){
                             PrintErrorNum(9,node->pos);
                             break;
                         }
@@ -508,23 +491,17 @@ void do_semantics(struct Tree* node){
                 }
                 else{
                     // Exp->Exp LB Exp RB
-                    do_semantics(node->children);
-                    do_semantics(node->children->next->next);
-                    node->leftValue=1;
-                    if(node->children->exp_type->kind!=ARRAY){
+                    struct Tree* exp1=node->children,*exp2=node->children->next->next;
+                    do_semantics(exp1);
+                    do_semantics(exp2);
+                    if(exp1->exp_type->kind!=ARRAY){
                         PrintErrorNum(10,node->pos);
-                        Type t=(Type)malloc(sizeof(struct Type_));
-                        t->kind=BASIC;
-                        strcpy(t->u.basic,"int");
-                        node->exp_type=t;
+                        node->exp_type=genBasicType("int");
                         break;
                     }
-                    node->exp_type=node->children->exp_type->u.array.elem;
-                    if(node->children->next->next->exp_type->kind!=BASIC){
-                        PrintErrorNum(12,node->pos);
-                        break;
-                    }
-                    if(strcmp(node->children->next->next->exp_type->u.basic,"int")!=0){
+                    node->exp_type=exp1->exp_type->u.array.elem;
+                    if(exp2->exp_type->kind!=BASIC || 
+                        strcmp(exp2->exp_type->u.basic,"int")!=0){
                         PrintErrorNum(12,node->pos);
                         break;
                     }
@@ -534,86 +511,49 @@ void do_semantics(struct Tree* node){
         else if(strcmp(node->V.v_string,"ExtDefList")==0){
             // ExtDefList->ExtDef ExtDefList
             // ExtDefList->empty
-            while(node->type!=6){
-                do_semantics(node->children);
-                node=node->children->next;
+            struct Tree* extdeflist=node;
+            while(extdeflist->type!=6){
+                do_semantics(extdeflist->children);
+                extdeflist=extdeflist->children->next;
             }
         }
         else if(strcmp(node->V.v_string,"ExtDef")==0){
             if(strcmp(node->children->next->V.v_string,"SEMI")==0){
-                //ExtDef->Specifier SEMI
+                // ExtDef->Specifier SEMI
+                struct Tree* specifier=node->children;
                 do_semantics(node->children);
             }
             else if(strcmp(node->children->next->V.v_string,"ExtDecList")==0){
-                //ExtDef->Specifier ExtDecList SEMI
-                do_semantics(node->children);
-                char specifier[40];
-                strcpy(specifier,node->children->specifier);
-                struct Tree* cur=node->children->next; // cur->ExtDecList
-                while(cur->children->next!=NULL){
-                    if(cur->children->children->next==NULL){
-                        if(findSymbolWithName(cur->children->children->V.v_string,0)!=NULL){
-                            PrintErrorNum(3,node->pos);
-                            break;
-                        }
-                        else if(findStructWithName(cur->children->children->V.v_string)!=NULL){
-                            PrintErrorNum(3,node->pos);
-                            break;
-                        }
-                        else
-                            addVar2Symbol(cur->children->children->V.v_string,0,specifier);
-                    }
-                    else{
-                        if(findSymbolWithName(cur->children->children->V.v_string,0)!=NULL){
-                            PrintErrorNum(3,node->pos);
-                            break;
-                        }
-                        else if(findStructWithName(cur->children->children->V.v_string)!=NULL){
-                            PrintErrorNum(3,node->pos);
-                            break;
-                        }
-                        else
-                            addArray2Symbol(cur->children,0,specifier);
-                    }
-                    cur=cur->children->next->next;
+                // ExtDef->Specifier ExtDecList SEMI
+                struct Tree* specifier=node->children;
+                do_semantics(specifier);
+                struct Tree* extdeclist=node->children->next;
+                while(extdeclist->children->next!=NULL){
+                    // ExtDecList->VarDec COMMA ExtDecList
+                    struct Tree* vardec=extdeclist->children;
+                    strcpy(vardec->specifier,specifier->specifier);
+                    do_semantics(vardec);
+                    extdeclist=extdeclist->children->next->next;
                 }
-                if(cur->children->children->next==NULL){
-                    if(findSymbolWithName(cur->children->children->V.v_string,0)!=NULL){
-                        PrintErrorNum(3,node->pos);
-                        break;
-                    }
-                    else if(findStructWithName(cur->children->children->V.v_string)!=NULL){
-                        PrintErrorNum(3,node->pos);
-                        break;
-                    }
-                    else
-                        addVar2Symbol(cur->children->children->V.v_string,0,specifier);
-                }
-                else{
-                    if(findSymbolWithName(cur->children->children->V.v_string,0)!=NULL){
-                        PrintErrorNum(3,node->pos);
-                        break;
-                    }
-                    else if(findStructWithName(cur->children->children->V.v_string)!=NULL){
-                        PrintErrorNum(3,node->pos);
-                        break;
-                    }
-                    else
-                        addArray2Symbol(cur->children,0,specifier);
+                {// ExtDecList->VarDec
+                struct Tree* vardec=extdeclist->children;
+                strcpy(vardec->specifier,specifier->specifier);
+                do_semantics(vardec);
                 }
             }
             else{
-                //ExtDef->Specifier FunDec CompSt
-                do_semantics(node->children);
-                struct Tree* cur=node->children->next; // cur->FunDec
+                // ExtDef->Specifier FunDec CompSt
+                struct Tree* specifier=node->children, *fundec=node->children->next, *id=fundec->children;
+                do_semantics(specifier);
                 Type ret_type=(Type)malloc(sizeof(struct Type_));
                 ret_type->kind=BASIC;
-                strcpy(ret_type->u.basic,node->children->specifier);
+                strcpy(ret_type->u.basic,specifier->specifier);
                 char name[40];
-                strcpy(name,cur->children->V.v_string);
-                if(strcmp(cur->children->next->next->V.v_string,"RP")==0){
-                    if(findSymbolWithName(cur->children->V.v_string,1)!=NULL){
-                        PrintErrorNum(4,node->pos);
+                strcpy(name,id->V.v_string);
+                if(strcmp(id->next->next->V.v_string,"RP")==0){
+                    // FunDec->ID LP RP
+                    if(findSymbolWithName(id->V.v_string,1)!=NULL){
+                        PrintErrorNum(4,fundec->pos);
                         break;
                     }
                     else 
@@ -621,27 +561,32 @@ void do_semantics(struct Tree* node){
                         ,0,NULL);
                 }
                 else{
-                    cur=cur->children->next->next; // cur->VarList
+                    // FunDec->ID LP VarList RP
+                    struct Tree* varlist=fundec->children->next->next;
                     int p_num=1;
-                    struct Tree* c=cur;
-                    while(c->children->next!=NULL){
+                    struct Tree* v=varlist;
+                    while(v->children->next!=NULL){
                         ++p_num;
-                        c=c->children->next->next;
+                        v=v->children->next->next;
                     }
                     Type* param=(Type*)malloc(sizeof(Type)*p_num);
                     int index=0;
-                    while(cur->children->next!=NULL){
-                        do_semantics(cur->children);
+                    while(varlist->children->next!=NULL){
+                        // VarList->ParamDec COMMA VarList
+                        struct Tree* paramdec=varlist->children;
+                        do_semantics(paramdec);
                         Type t=(Type)malloc(sizeof(struct Type_));
-                        t=cur->children->ParamDecType;
+                        t=paramdec->ParamDecType;
                         param[index]=t;
-                        cur=cur->children->next->next;
+                        varlist=varlist->children->next->next;
                         ++index;
                     }
-                    {do_semantics(cur->children);
-                    Type t=(Type)malloc(sizeof(struct Type_));
-                    t=cur->children->ParamDecType;
-                    param[index]=t;
+                    {
+                        struct Tree* paramdec=varlist->children;
+                        do_semantics(paramdec);;
+                        Type t=(Type)malloc(sizeof(struct Type_));
+                        t=paramdec->ParamDecType;
+                        param[index]=t;
                     }
                     if(findSymbolWithName(name,1)!=NULL){
                         PrintErrorNum(4,node->pos);
@@ -651,8 +596,9 @@ void do_semantics(struct Tree* node){
                         addFunc2Symbol(name,1,ret_type
                         ,p_num,param);
                 }
-                node->children->next->next->ReturnType=ret_type;
-                do_semantics(node->children->next->next);
+                struct Tree* compst=node->children->next->next;
+                compst->ReturnType=ret_type;
+                do_semantics(compst);
             }
         }
         else if(strcmp(node->V.v_string,"Specifier")==0){
@@ -684,180 +630,210 @@ void do_semantics(struct Tree* node){
                 strcpy(node->specifier,tag);
             }
         }
-        else if(strcmp(node->V.v_string,"ParamDec")==0){
-            //ParamDec->Specifier VarDec
-            do_semantics(node->children);
-            if(node->children->next->children->next==NULL){
-                Type t=(Type)malloc(sizeof(struct Type_));
-                t->kind=BASIC;
-                strcpy(t->u.basic,node->children->specifier);
-                if(findSymbolWithName(node->children->next->children->V.v_string,0)!=NULL){
-                    PrintErrorNum(3,node->pos);
+        else if(strcmp(node->V.v_string,"VarDec")==0){
+            struct Tree* vardec=node, *id=node->children;
+            if(id->next==NULL){
+                // VarDec->ID
+                struct symbol* s=findSymbolWithName(id->V.v_string,0);
+                struct TypeTable* tt=findStructWithName(id->V.v_string);
+                if(s!=NULL){
+                    PrintErrorNum(3,vardec->pos);
+                    vardec->exp_type=s->val.var;
                     break;
                 }
-                else if(findStructWithName(node->children->next->children->V.v_string)!=NULL){
-                    PrintErrorNum(3,node->pos);
+                else if(tt!=NULL){
+                    PrintErrorNum(3,vardec->pos);
+                    vardec->exp_type=genBasicType(tt->name);
                     break;
                 }
                 else
-                    addVar2Symbol(node->children->next->children->V.v_string,0,node->children->specifier);
-                node->ParamDecType=t;
+                    addVar2Symbol(id->V.v_string,0,vardec->specifier);
             }
             else{
-                node->ParamDecType=genArrayType(node->children->next,node->children->specifier);
-                if(findSymbolWithName(node->children->next->children->V.v_string,0)!=NULL){
+                // VarDec->ID LB INT RB
+                struct symbol* s=findSymbolWithName(id->V.v_string,0);
+                struct TypeTable* tt=findStructWithName(id->V.v_string);
+                if(s!=NULL){
                     PrintErrorNum(3,node->pos);
                     break;
                 }
-                else if(findStructWithName(node->children->next->children->V.v_string)!=NULL){
+                else if(findStructWithName(id->V.v_string)!=NULL){
                     PrintErrorNum(3,node->pos);
                     break;
                 }
                 else
-                    addArray2Symbol(node->children->next,0,node->children->specifier);
+                    addArray2Symbol(vardec,0,vardec->specifier);
+            }
+        }
+        else if(strcmp(node->V.v_string,"ParamDec")==0){
+            //ParamDec->Specifier VarDec
+            struct Tree* specifier=node->children;
+            do_semantics(specifier);
+            struct Tree* vardec=node->children->next, *id=vardec->children;
+            if(id->next==NULL){
+                // VarDec->ID
+                Type t=(Type)malloc(sizeof(struct Type_));
+                t->kind=BASIC;
+                strcpy(t->u.basic,specifier->specifier);
+                node->ParamDecType=t;
+                if(findSymbolWithName(id->V.v_string,0)!=NULL){
+                    PrintErrorNum(3,vardec->pos);
+                    break;
+                }
+                else if(findStructWithName(id->V.v_string)!=NULL){
+                    PrintErrorNum(3,vardec->pos);
+                    break;
+                }
+                else
+                    addVar2Symbol(id->V.v_string,0,specifier->specifier);
+            }
+            else{
+                node->ParamDecType=genArrayType(vardec,specifier->specifier);
+                if(findSymbolWithName(id->V.v_string,0)!=NULL){
+                    PrintErrorNum(3,vardec->pos);
+                    break;
+                }
+                else if(findStructWithName(id->V.v_string)!=NULL){
+                    PrintErrorNum(3,vardec->pos);
+                    break;
+                }
+                else
+                    addArray2Symbol(vardec,0,specifier->specifier);
             }
         }
         else if(strcmp(node->V.v_string,"CompSt")==0){
             //CompSt->LC DefList StmtList RC
-            do_semantics(node->children->next);
-            node->children->next->next->ReturnType=node->ReturnType;
-            do_semantics(node->children->next->next);
+            struct Tree* deflist=node->children->next, *stmtlist=deflist->next;
+            do_semantics(deflist);
+            stmtlist->ReturnType=node->ReturnType;
+            do_semantics(stmtlist);
         }
         else if(strcmp(node->V.v_string,"DefList")==0){
             //DefList->Def DefList
             //DefList->empty
-            while(node->type!=6){
-                node=node->children; // node->Def
-                do_semantics(node->children);
-                struct Tree*declist=node->children->next;
+            struct Tree* deflist=node;
+            while(deflist->type!=6){
+                // Def->Specifier DecList SEMI
+                struct Tree* def=deflist->children, *specifier=def->children, *declist=def->children->next;
+                do_semantics(specifier);
                 while(declist->children->next!=NULL){
+                    // DecList->Dec COMMA DecList
                     struct Tree*vardec=declist->children->children;
-                    if(vardec->children->next==NULL){
-                        if(findSymbolWithName(vardec->children->V.v_string,0)!=NULL){
-                            PrintErrorNum(3,node->pos);
-                            break;
-                        }
-                        else if(findStructWithName(vardec->children->V.v_string)!=NULL){
-                            PrintErrorNum(3,node->pos);
-                            break;
-                        }
-                        else 
-                            addVar2Symbol(vardec->children->V.v_string,0,node->children->specifier);
-                    }
-                    else{
-                        if(findSymbolWithName(vardec->children->V.v_string,0)!=NULL){
-                            PrintErrorNum(3,node->pos);
-                            break;
-                        }
-                        else if(findStructWithName(vardec->children->V.v_string)!=NULL){
-                            PrintErrorNum(3,node->pos);
-                            break;
-                        }
-                        else 
-                            addArray2Symbol(vardec,0,node->children->specifier);
-                    }
+                    // Dec->VarDec
+                    // Dec->VarDec ASSIGNOP Exp
+                    strcpy(vardec->specifier,specifier->specifier);
+                    do_semantics(vardec);
                     if(vardec->next!=NULL){
-                        do_semantics(vardec->next->next);
-                        if(!Compare2Type(vardec->next->next->exp_type,findSymbolWithName(vardec->children->V.v_string,0)->val.var)){
-                            PrintErrorNum(5,node->pos);
+                        struct Tree* exp=vardec->next->next, *v=vardec;
+                        while(v->children->next!=NULL) v=v->children;
+                        struct Tree* id=v->children;
+                        do_semantics(exp);
+                        Type t;
+                        struct symbol* s=findSymbolWithName(id->V.v_string,0);
+                        if(s!=NULL) t=s->val.var;
+                        else{
+                            struct TypeTable* tt=findStructWithName(id->V.v_string);
+                            t=genBasicType(tt->name);
+                        }
+                        if(!Compare2Type(exp->exp_type,t)){
+                            PrintErrorNum(5,vardec->pos);
                         }
                     }
                     declist=declist->children->next->next;
                 }
-                {struct Tree*vardec=declist->children->children;
-                if(vardec->children->next==NULL){
-                    if(findSymbolWithName(vardec->children->V.v_string,0)!=NULL){
-                        PrintErrorNum(3,node->pos);
-                        break;
-                    }
-                    else if(findStructWithName(vardec->children->V.v_string)!=NULL){
-                        PrintErrorNum(3,node->pos);
-                        break;
-                    }
-                    else
-                        addVar2Symbol(vardec->children->V.v_string,0,node->children->specifier);
-                }
-                else{
-                    if(findSymbolWithName(vardec->children->V.v_string,0)!=NULL){
-                        PrintErrorNum(3,node->pos);
-                        break;
-                    }
-                    else if(findStructWithName(vardec->children->V.v_string)!=NULL){
-                        PrintErrorNum(3,node->pos);
-                        break;
-                    }
-                    else
-                        addArray2Symbol(vardec,0,node->children->specifier);
-                }
-                if(vardec->next!=NULL){
-                    do_semantics(vardec->next->next);
-                    if(!Compare2Type(vardec->next->next->exp_type,findSymbolWithName(vardec->children->V.v_string,0)->val.var)){
-                        PrintErrorNum(5,node->pos);
+                {
+                    // DecList->Dec
+                    struct Tree*vardec=declist->children->children;
+                    // Dec->VarDec
+                    // Dec->VarDec ASSIGNOP Exp
+                    strcpy(vardec->specifier,specifier->specifier);
+                    do_semantics(vardec);
+                    if(vardec->next!=NULL){
+                        struct Tree* exp=vardec->next->next, *v=vardec;
+                        while(v->children->next!=NULL) v=v->children;
+                        struct Tree* id=v->children;
+                        do_semantics(exp);
+                        Type t;
+                        struct symbol* s=findSymbolWithName(id->V.v_string,0);
+                        if(s!=NULL) t=s->val.var;
+                        else{
+                            struct TypeTable* tt=findStructWithName(id->V.v_string);
+                            t=genBasicType(tt->name);
+                        }
+                        if(!Compare2Type(exp->exp_type,t)){
+                            PrintErrorNum(5,vardec->pos);
+                        }
                     }
                 }
-                }
-                node=node->next;
+                deflist=def->next;;
             }
         }
         else if(strcmp(node->V.v_string,"StmtList")==0){
             //StmtList->Stmt StmtList
             //StmtList->empty
-            while(node->type!=6){
-                node->children->ReturnType=node->ReturnType;
-                node=node->children; // node->Stmt
-                do_semantics(node);
-                node->next->ReturnType=node->ReturnType;
-                node=node->next;
+            struct Tree* stmtlist=node;
+            while(stmtlist->type!=6){
+                struct Tree* stmt=stmtlist->children;
+                stmt->ReturnType=stmtlist->ReturnType;
+                do_semantics(stmt);
+                stmtlist=stmt->next;
+                stmtlist->ReturnType=stmt->ReturnType;
             }
         }
         else if(strcmp(node->V.v_string,"Stmt")==0){
             if(node->children->next==NULL){
                 //Stmt->Compst
-                node->children->ReturnType=node->ReturnType;
-                do_semantics(node->children);
+                struct Tree* compst=node->children;
+                compst->ReturnType=node->ReturnType;
+                do_semantics(compst);
             }
             else if(node->children->next->next==NULL){
                 //Stmt->Exp SEMI
-                do_semantics(node->children);
+                struct Tree* exp=node->children;
+                do_semantics(exp);
             }
             else if(node->children->next->next->next==NULL){
                 //Stmt->RETURN Exp SEMI
-                do_semantics(node->children->next);
-                if(!Compare2Type(node->ReturnType,node->children->next->exp_type)){
-                    PrintErrorNum(8,node->pos);
+                struct Tree* exp=node->children->next;
+                do_semantics(exp);
+                if(!Compare2Type(node->ReturnType,exp->exp_type)){
+                    PrintErrorNum(8,exp->pos);
                 }
             }
             else if(strcmp(node->children->V.v_string,"WHILE")==0){
                 //Stmt->WHILE LP Exp RP Stmt
-                do_semantics(node->children->next->next);
-                if(node->children->next->next->exp_type->kind!=BASIC||
-                    strcmp(node->children->next->next->exp_type->u.basic,"int")!=0){
-                        PrintErrorNum(7,node->pos);
+                struct Tree* exp=node->children->next->next, *stmt1=node->children->next->next->next->next;
+                do_semantics(exp);
+                if(exp->exp_type->kind!=BASIC||
+                    strcmp(exp->exp_type->u.basic,"int")!=0){
+                        PrintErrorNum(7,exp->pos);
                 }
-                node->children->next->next->next->next->ReturnType=node->ReturnType;
-                do_semantics(node->children->next->next->next->next);
+                stmt1->ReturnType=node->ReturnType;
+                do_semantics(stmt1);
             }
             else if(node->children->next->next->next->next->next==NULL){
                 //stmt->IF LP Exp RP Stmt
-                do_semantics(node->children->next->next);
-                if(node->children->next->next->exp_type->kind!=BASIC||
-                    strcmp(node->children->next->next->exp_type->u.basic,"int")!=0){
-                        PrintErrorNum(7,node->pos);
+                struct Tree* exp=node->children->next->next, *stmt1=node->children->next->next->next->next;
+                do_semantics(exp);
+                if(exp->exp_type->kind!=BASIC||
+                    strcmp(exp->exp_type->u.basic,"int")!=0){
+                        PrintErrorNum(7,exp->pos);
                 }
-                node->children->next->next->next->next->ReturnType=node->ReturnType;
-                do_semantics(node->children->next->next->next->next);
+                stmt1->ReturnType=node->ReturnType;
+                do_semantics(stmt1);
             }
             else{
                 //stmt->IF LP Exp RP Stmt ELSE Stmt
-                do_semantics(node->children->next->next);
-                if(node->children->next->next->exp_type->kind!=BASIC||
-                    strcmp(node->children->next->next->exp_type->u.basic,"int")!=0){
-                        PrintErrorNum(7,node->pos);
+                struct Tree* exp=node->children->next->next, *stmt1=node->children->next->next->next->next, *stmt2=stmt1->next->next;
+                do_semantics(exp);
+                if(exp->exp_type->kind!=BASIC||
+                    strcmp(exp->exp_type->u.basic,"int")!=0){
+                        PrintErrorNum(7,exp->pos);
                 }
-                node->children->next->next->next->next->ReturnType=node->ReturnType;
-                do_semantics(node->children->next->next->next->next);
-                node->children->next->next->next->next->next->next->ReturnType=node->ReturnType;
-                do_semantics(node->children->next->next->next->next->next->next);
+                stmt1->ReturnType=node->ReturnType;
+                do_semantics(stmt1);
+                stmt2->ReturnType=node->ReturnType;
+                do_semantics(stmt2);
             }
         }
         else{

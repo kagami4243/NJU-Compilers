@@ -98,6 +98,7 @@ struct Tree* newTreeNode(struct Tree* next, struct Tree* children, int pos, int 
     t->next=next; t->children=children;
     t->pos=pos;
     t->type=type;
+    t->leftValue=0;
     switch(type){
         case 0: case 3: case 4: case 5: case 6:
                 t->V.v_string=strdup(value); break;
