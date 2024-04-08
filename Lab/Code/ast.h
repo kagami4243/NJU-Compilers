@@ -1,3 +1,5 @@
+#ifndef AST_H
+#define AST_H
 
 union Value{
     int v_int;
@@ -20,3 +22,6 @@ struct Tree
 
 struct Tree* root;
 struct Tree* newTreeNode(struct Tree* next, struct Tree* children, int pos, int type, char* value);
+
+
+#endif

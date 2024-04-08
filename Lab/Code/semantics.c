@@ -9,6 +9,7 @@ struct TypeTable* structTable;
 static int error_pos=-1; // avoid duplicate error messages
 
 void PrintErrorNum(int num, int pos){
+    set_error();
     if(error_pos!=pos){
         printf("Error type %d at Line %d: \n",num, pos);
         error_pos=pos;
@@ -254,7 +255,6 @@ char* add2StructTable(struct Tree*structspecifier){
             if(vardec->next!=NULL){
                 PrintErrorNum(15,vardec->pos);
             }
-            declist=declist->children->next->next;
         }
         deflist=def->next;
     }

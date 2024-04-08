@@ -1,3 +1,6 @@
+#ifndef SEMANTICS_H
+#define SEMANTICS_H
+
 #include "ast.h"
 
 int StructTableUni=0; // for anonymous struct
@@ -88,3 +91,5 @@ struct TypeTable* findStructWithName(char*name);
 
 /*main function for semantic analysis*/
 void do_semantics(struct Tree* node);
+
+#endif

@@ -12,7 +12,7 @@
     yylloc.last_column = yycolumn + yyleng - 1; \
     yycolumn += yyleng;
     void Print_A_Error();
-    int isError = 0, isPrint = 1;
+    int isErrorAB = 0, isPrintAB = 1;
 %}
 %option yylineno
 
@@ -47,7 +47,7 @@ WHILE       "while"
 
 %%
 [ \t\r]+    { ; }
-\n          { yycolumn = 1; isError=0; }
+\n          { yycolumn = 1; isErrorAB=0; }
 "//".*      { ; }
 "/*"        {   
                 int c1 = 0, c2 = input();
@@ -110,7 +110,8 @@ struct Tree* newTreeNode(struct Tree* next, struct Tree* children, int pos, int 
 }  
 
 void Print_A_Error(){
-    if(!isError) 
+    set_error();
+    if(!isErrorAB) 
         printf("Error type A at Line %d: Mysterious characters \'%s\'\n", yylineno, yytext); 
-    isError = 1; isPrint = 0;
+    isErrorAB = 1; isPrintAB = 0;
 }

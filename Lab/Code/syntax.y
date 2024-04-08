@@ -3,7 +3,7 @@
 %{
     #include <stdio.h>
     #include "lex.yy.c"
-    extern int isError, isPrint;
+    extern int isErrorAB, isPrintAB;
     void PrintTree(struct Tree* t, int num);
 %}
 %union{
@@ -167,6 +167,7 @@ void PrintTree(struct Tree* t, int num){
 }
 
 void Print_B_Error(){
-    if(!isError) printf("Error type B at Line %d: %s\n", yylineno, yytext);
-    isError = 1; isPrint = 0;
+    set_error();
+    if(!isErrorAB) printf("Error type B at Line %d: %s\n", yylineno, yytext);
+    isErrorAB = 1; isPrintAB = 0;
 }

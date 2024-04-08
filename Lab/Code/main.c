@@ -1,4 +1,5 @@
 #include<stdio.h>
+int error=0;
 
 int main(int argc, char** argv) {
     if (argc <= 1) return 1;
@@ -9,7 +10,11 @@ int main(int argc, char** argv) {
     }
     yyrestart(f);
     yyparse();
+    if(error==1) return 0;
     semantics();
     return 0;
 }
 
+void set_error(){
+    error=1;
+}
