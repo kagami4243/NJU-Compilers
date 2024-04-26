@@ -44,6 +44,7 @@ void addVar2Symbol(char*name, int type,char* type_name){
     var->kind=BASIC;
     strcpy(var->u.basic,type_name);
     s->val.var=var;
+    s->param=0;
     return;
 }
 
@@ -77,6 +78,7 @@ char* addArray2Symbol(struct Tree*node,int type,char*type_name){
     s->val.var=head;
     char* name=(char*)malloc(sizeof(char)*40);
     strcpy(name,s->name);
+    s->param=0;
     return name;
 }
 
@@ -87,7 +89,7 @@ Type genArrayType(struct Tree*node,char*type_name){
         Type t=(Type)malloc(sizeof(struct Type_));
         t->kind=ARRAY;
         t->u.array.elem=NULL;
-        t->u.array.size=node->next->V.v_int;
+        t->u.array.size=node->children->next->next->V.v_int;
         if(head==NULL) head=tail=t;
         else{
             tail->u.array.elem=t;
@@ -703,8 +705,10 @@ void do_semantics(struct Tree* node){
                     PrintErrorNum(3,vardec->pos);
                     break;
                 }
-                else
+                else{
                     addVar2Symbol(id->V.v_string,0,specifier->specifier);
+                    setParam(id->V.v_string);
+                }
             }
             else{
                 node->ParamDecType=genArrayType(vardec,specifier->specifier);
@@ -894,4 +898,9 @@ int calculateVarSize(Type var){
         }
         return findStructWithName(var->u.basic)->size;
     }
+}
+
+void setParam(char* name){
+    struct symbol* s=findSymbolWithName(name,0);
+    s->param=1;
 }

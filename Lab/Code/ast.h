@@ -18,8 +18,6 @@ struct Tree
     char specifier[40]; 
     struct Type_* ParamDecType;
     struct Type_* ReturnType;
-    int address; // address var or not
-    int dereference; // dereference var or not
 };
 
 struct Tree* root;

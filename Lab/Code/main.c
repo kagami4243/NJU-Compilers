@@ -15,6 +15,12 @@ int main(int argc, char** argv) {
     semantics();
     if(error==1) return 0;
     translate_Program();
+    fclose(output);
+    if(error==1){
+        output=fopen(argv[2],"w");
+        fclose(output);
+        return 0;
+    } 
     return 0;
 }
 

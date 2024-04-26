@@ -115,6 +115,7 @@ void translate_Stmt(struct Tree* stmt){
         }
     }
     else{
+        // WHILE
         char*l1=newLabel(),*l2=newLabel(),*l3=newLabel();
         fprintf(output,"LABEL %s :\n",l1);
         translate_Cond(stmt->children->next->next,l2,l3);
@@ -155,7 +156,6 @@ void translate_Dec(struct Tree* dec, char* specifier){
     }
 }
 
-
 void translate_Exp(struct Tree* exp, char* place){
     if(exp->children->type==1){
         if(place!=NULL) fprintf(output,"%s := #%d\n",place,exp->children->V.v_int);
@@ -165,8 +165,14 @@ void translate_Exp(struct Tree* exp, char* place){
             Type t=exp->exp_type;
             if(strcmp("int",t->u.basic)==0)
                 fprintf(output,"%s := %s\n",place,exp->children->V.v_string);
-            else 
-                fprintf(output,"%s := &%s\n",place,exp->children->V.v_string);
+            else{
+                if(findSymbolWithName(exp->children->V.v_string,0)->param){
+                    fprintf(output,"%s := %s\n",place,exp->children->V.v_string);
+                }
+                else{
+                    fprintf(output,"%s := &%s\n",place,exp->children->V.v_string);
+                }
+            }  
         }
     }
     else if(strcmp(exp->children->next->V.v_string,"ASSIGNOP")==0){
@@ -186,10 +192,14 @@ void translate_Exp(struct Tree* exp, char* place){
                 int size=calculateVarSize(t2)/t2->u.array.size;
                 for(int i=0;i<t2->u.array.size;++i){
                     char* nt1=newTemp(),*nt2=newTemp();
-                    fprintf(output,"%s := &%s",nt1,exp1->children->V.v_string);
+                    if(findSymbolWithName(exp1->children->V.v_string,0)->param)
+                        fprintf(output,"%s := %s",nt1,exp1->children->V.v_string);
+                    else fprintf(output,"%s := &%s",nt1,exp1->children->V.v_string);
                     if(i) fprintf(output," + #%d",size*i);
                     fprintf(output,"\n");
-                    fprintf(output,"%s := &%s",nt2,exp2->children->V.v_string);
+                    if(findSymbolWithName(exp2->children->V.v_string,0)->param)
+                        fprintf(output,"%s := %s",nt1,exp1->children->V.v_string);
+                    else fprintf(output,"%s := &%s",nt2,exp2->children->V.v_string);
                     if(i) fprintf(output," + #%d",size*i);
                     fprintf(output,"\n");
                     fprintf(output,"*%s := *%s\n",nt1,nt2);
@@ -197,7 +207,8 @@ void translate_Exp(struct Tree* exp, char* place){
             }
         }
         else if(strcmp(exp->children->children->next->V.v_string,"LB")==0){
-            if(exp->children->children->children->type==4){
+            if(exp->children->exp_type->kind==BASIC ||
+                exp->children->exp_type->u.array.elem->kind!=ARRAY){
                 char* t1=newTemp(),*t2=newTemp();
                 translate_Exp(exp->children,t1);
                 translate_Exp(exp->children->next->next,t2);
@@ -205,10 +216,13 @@ void translate_Exp(struct Tree* exp, char* place){
                 if(place!=NULL) fprintf(output,"%s := %s\n",place,t1);
             }
             else{
-                printf("Cannot translate: Code contains variables of multi-dimensional array type or parameters of array type.");
+                printf("Cannot translate: Code contains variables of multi-dimensional array type or parameters of array type.\n");
+                set_error();
+                return;
             }
         } 
         else{
+            // Exp DOT ID ASSIGNOP Exp
             char* t1=newTemp(),*t2=newTemp();
             translate_Exp(exp->children,t1);
             translate_Exp(exp->children->next->next,t2);
@@ -258,30 +272,40 @@ void translate_Exp(struct Tree* exp, char* place){
         translate_Exp(exp->children->next,place);
     }
     else if(strcmp(exp->children->next->V.v_string,"LB")==0){
-        if(exp->children->children->type==4){
-            if(place!=NULL){
-                struct Tree* id=exp->children->children;
-                char*t1=newTemp(),*t2=newTemp();
-                translate_Exp(exp->children->next->next,t1);
-                Type v=exp->children->exp_type;
-                int size=calculateVarSize(v)/v->u.array.size;
-                fprintf(output,"%s := %s * #%d\n",t2,t1,size);            
-                fprintf(output,"%s := &%s + %s\n",place,id->V.v_string,t2);
-                char t[40];
-                strcpy(t,place);
-                sprintf(place,"*%s",t);
-            }
+        if(exp->children->children->next!=NULL && 
+            exp->children->children->next->next!=NULL &&
+            strcmp(exp->children->children->next->next->V.v_string,"LB")==0){
+                printf("Cannot translate: Code contains variables of multi-dimensional array type or parameters of array type.\n");
+                set_error();
+                return;
         }
-        else{
-            printf("Cannot translate: Code contains variables of multi-dimensional array type or parameters of array type.");
+        if(place!=NULL){
+            struct Tree* exp1=exp->children;
+            char*t1=newTemp(),*t2=newTemp();
+            translate_Exp(exp->children->next->next,t1);
+            Type v=exp->children->exp_type;
+            int size=calculateVarSize(v)/v->u.array.size;
+            fprintf(output,"%s := %s * #%d\n",place,t1,size); 
+            translate_Exp(exp1,t2);          
+            if(t2[0]=='*') fprintf(output,"%s := %s + %s\n",place,place,t2+1);
+            else fprintf(output,"%s := %s + %s\n",place,place,t2);
+            char t[40];
+            strcpy(t,place);
+            sprintf(place,"*%s",t);
         }
     }
     else if(strcmp(exp->children->next->V.v_string,"DOT")==0){
-        char*t1=newTemp(),*t2=newTemp();
-        translate_Exp(exp->children,t1);
-        int offset=findOffset(exp->children->exp_type,exp->children->next->next->V.v_string);
         if(place!=NULL){
-            fprintf(output,"%s := %s + #%d\n",place,t1,offset);
+            char*t1=newTemp();
+            translate_Exp(exp->children,t1);
+            char t[40];
+            strcpy(t,t1);
+            if(t[0]=='*') sprintf(t1,"%s",t+1);
+            struct symbol* s=findSymbolWithName(exp->children->V.v_string,0);
+            if(s!=NULL && !s->param) sprintf(t1,"&%s",t+1);
+            fprintf(output,"%s := %s + #%d\n",place,t1,findOffset(exp->children->exp_type,exp->children->next->next->V.v_string));
+            strcpy(t,place);
+            sprintf(place,"*%s",t);
         }
     }
     else if(exp->children->type==4){
@@ -354,21 +378,19 @@ void translate_Cond(struct Tree* exp, char* label_true, char* label_false){
 }
 
 void translate_Args(struct Tree* args,arg_list al){
-    if(args->children->next==NULL){
-        char* t1=newTemp();
-        translate_Exp(args->children,t1);
-        arg_list a=(arg_list)malloc(sizeof(struct args));
+    char* t1=newTemp();
+    translate_Exp(args->children,t1);
+    arg_list a=(arg_list)malloc(sizeof(struct args));
+    if(strcmp(args->children->exp_type->u.basic,"int")==0){
         strcpy(a->name,t1);
-        a->next=al->next;
-        al->next=a;
     }
     else{
-        char* t1=newTemp();
-        translate_Exp(args->children,t1);
-        arg_list a=(arg_list)malloc(sizeof(struct args));
-        strcpy(a->name,t1);
-        a->next=al->next;
-        al->next=a;
+        if(t1[0]=='*') sprintf(a->name,"%s",t1+1);
+        else strcpy(a->name,t1);
+    } 
+    a->next=al->next;
+    al->next=a;
+    if(args->children->next!=NULL){       
         translate_Args(args->children->next->next,al);
     }
 }

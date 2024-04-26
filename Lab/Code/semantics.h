@@ -16,6 +16,7 @@ struct symbol{
     } val; // item value
     struct symbol* next;
     char name[40];
+    int param; // parameter or not
 };
 
 struct Func{
@@ -94,5 +95,7 @@ struct TypeTable* findStructWithName(char*name);
 void do_semantics(struct Tree* node);
 
 int calculateVarSize(Type var);
+
+void setParam(char* name);
 
 #endif
