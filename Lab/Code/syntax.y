@@ -160,6 +160,7 @@ void PrintTree(struct Tree* t, int num){
         case 4: printf("ID: %s\n",t->V.v_string); break; // ID
         case 5: printf("TYPE: %s\n",t->V.v_string); break; // TYPE
         case 6: break; // empty
+        case 7: printf("RELOP\n"); break; // relop token
         default: break;
     };
     PrintTree(t->children,num+2);

@@ -75,7 +75,7 @@ WHILE       "while"
 {SEMI}      { yylval.type_Tree=newTreeNode(NULL,NULL,yylineno,3,"SEMI"); return SEMI; }
 {COMMA}     { yylval.type_Tree=newTreeNode(NULL,NULL,yylineno,3,"COMMA"); return COMMA; }
 {ASSIGNOP}  { yylval.type_Tree=newTreeNode(NULL,NULL,yylineno,3,"ASSIGNOP"); return ASSIGNOP; }
-{RELOP}     { yylval.type_Tree=newTreeNode(NULL,NULL,yylineno,3,"RELOP"); return RELOP; }
+{RELOP}     { yylval.type_Tree=newTreeNode(NULL,NULL,yylineno,7,yytext); return RELOP; }
 {PLUS}      { yylval.type_Tree=newTreeNode(NULL,NULL,yylineno,3,"PLUS"); return PLUS; }
 {MINUS}     { yylval.type_Tree=newTreeNode(NULL,NULL,yylineno,3,"MINUS"); return MINUS; }
 {STAR}      { yylval.type_Tree=newTreeNode(NULL,NULL,yylineno,3,"STAR"); return STAR; }
@@ -99,8 +99,10 @@ struct Tree* newTreeNode(struct Tree* next, struct Tree* children, int pos, int 
     t->pos=pos;
     t->type=type;
     t->leftValue=0;
+    t->address=0;
+    t->dereference=0;
     switch(type){
-        case 0: case 3: case 4: case 5: case 6:
+        case 0: case 3: case 4: case 5: case 6: case 7:
                 t->V.v_string=strdup(value); break;
         case 1: t->V.v_int=atoi(value); break;
         case 2: t->V.v_float=atof(value); break;

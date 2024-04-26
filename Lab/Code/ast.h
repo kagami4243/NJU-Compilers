@@ -8,7 +8,7 @@ union Value{
 };
 struct Tree
 {   
-    int type; // 0->no token, 1->int, 2->float, 3->token, 4->id, 5->type, 6->empty
+    int type; // 0->no token, 1->int, 2->float, 3->token, 4->id, 5->type, 6->empty, 7->relop
     union Value V;
     int pos;
     struct Tree* children;
@@ -18,6 +18,8 @@ struct Tree
     char specifier[40]; 
     struct Type_* ParamDecType;
     struct Type_* ReturnType;
+    int address; // address var or not
+    int dereference; // dereference var or not
 };
 
 struct Tree* root;

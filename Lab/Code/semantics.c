@@ -5,6 +5,7 @@
 
 struct symbol* symbolTable;
 struct TypeTable* structTable;
+int StructTableUni = 0;
 
 static int error_pos=-1; // avoid duplicate error messages
 
@@ -53,6 +54,7 @@ char* addArray2Symbol(struct Tree*node,int type,char*type_name){
         Type t=(Type)malloc(sizeof(struct Type_));
         t->kind=ARRAY;
         t->u.array.elem=NULL;
+        t->u.array.size=node->children->next->next->V.v_int;
         if(head==NULL) head=tail=t;
         else{
             tail->u.array.elem=t;
@@ -85,6 +87,7 @@ Type genArrayType(struct Tree*node,char*type_name){
         Type t=(Type)malloc(sizeof(struct Type_));
         t->kind=ARRAY;
         t->u.array.elem=NULL;
+        t->u.array.size=node->next->V.v_int;
         if(head==NULL) head=tail=t;
         else{
             tail->u.array.elem=t;
@@ -173,6 +176,7 @@ char* add2StructTable(struct Tree*structspecifier){
         PrintErrorNum(16,tag->pos);
         return tag;
     }
+    int size=0;
     struct Tree* deflist=tag->next->next;
     FieldList t=(FieldList)malloc(sizeof(struct FieldList_));
     t->tail=NULL;
@@ -190,6 +194,12 @@ char* add2StructTable(struct Tree*structspecifier){
                 unit->kind=BASIC;
                 strcpy(unit->u.basic,specifier->specifier);
                 strcpy(name,vardec->children->V.v_string);
+                if(strcmp(specifier,"int")==0 || strcmp(specifier,"float")==0){
+                    size+=4;
+                }
+                else{
+                    size+=findStructWithName(specifier->specifier)->size;
+                }
                 if(findSymbolWithName(vardec->children->V.v_string,0)!=NULL
                     || findStructWithName(vardec->children->V.v_string)!=NULL){
                     PrintErrorNum(15,vardec->children->pos);
@@ -200,6 +210,7 @@ char* add2StructTable(struct Tree*structspecifier){
             else{
                 unit->kind=ARRAY;
                 unit->u.array=genArrayType(vardec,specifier->specifier)->u.array;
+                size+=calculateVarSize(unit);
                 struct Tree* v=vardec;
                 while(v->children->next!=NULL) v=v->children;
                 if(findSymbolWithName(v->children->V.v_string,0)!=NULL
@@ -219,7 +230,7 @@ char* add2StructTable(struct Tree*structspecifier){
             }
             declist=declist->children->next->next;
         }
-        {struct Tree*vardec=declist->children->children;
+        {   struct Tree*vardec=declist->children->children;
             FieldList field=(FieldList)malloc(sizeof(struct FieldList_));
             field->tail=NULL;
             Type unit=(Type)malloc(sizeof(struct Type_));
@@ -228,6 +239,12 @@ char* add2StructTable(struct Tree*structspecifier){
                 unit->kind=BASIC;
                 strcpy(unit->u.basic,specifier->specifier);
                 strcpy(name,vardec->children->V.v_string);
+                if(strcmp(specifier->specifier,"int")==0 || strcmp(specifier->specifier,"float")==0){
+                    size+=4;
+                }
+                else{
+                    size+=findStructWithName(specifier->specifier)->size;
+                }
                 if(findSymbolWithName(vardec->children->V.v_string,0)!=NULL
                     || findStructWithName(vardec->children->V.v_string)!=NULL){
                     PrintErrorNum(15,vardec->children->pos);
@@ -238,6 +255,7 @@ char* add2StructTable(struct Tree*structspecifier){
             else{
                 unit->kind=ARRAY;
                 unit->u.array=genArrayType(vardec,specifier->specifier)->u.array;
+                size+=calculateVarSize(unit);
                 struct Tree* v=vardec;
                 while(v->children->next!=NULL) v=v->children;
                 if(findSymbolWithName(v->children->V.v_string,0)!=NULL
@@ -262,6 +280,7 @@ char* add2StructTable(struct Tree*structspecifier){
     strcpy(tt->name,Tag);
     tt->t=t->tail;
     tt->next=structTable->next;
+    tt->size=size;
     structTable->next=tt;
     return Tag;
 }
@@ -371,7 +390,7 @@ void do_semantics(struct Tree* node){
                         break;
                     }
                 }
-                else if(strcmp(op,"PLUS")==0 || strcmp(op,"MINUS")==0 || strcmp(op,"RELOP")==0
+                else if(strcmp(op,"PLUS")==0 || strcmp(op,"MINUS")==0 || node->children->next->type==7
                         || strcmp(op,"STAR")==0 || strcmp(op,"DIV")==0){
                     // Exp->Exp RELOP Exp
                     // Exp->Exp PLUS Exp
@@ -393,7 +412,7 @@ void do_semantics(struct Tree* node){
                         node->exp_type=genBasicType("int");
                         break;
                     }
-                    if(strcmp(op,"RELOP")==0){
+                    if(node->children->next->type==7){
                         node->exp_type=genBasicType("int");
                     }
                     else 
@@ -853,5 +872,26 @@ void do_semantics(struct Tree* node){
 void semantics(){
     initSymbol();
     initStruct();
+    {
+        Type t=(Type)malloc(sizeof(struct Type_));
+        t->kind=BASIC;
+        strcpy(t->u.basic,"int");
+        addFunc2Symbol("read",1,t,0,NULL);
+        Type* p=(Type*)malloc(sizeof(Type));
+        p[0]=t;
+        addFunc2Symbol("write",1,t,1,p);
+    }
     do_semantics(root);
+}
+
+int calculateVarSize(Type var){
+    if(var->kind==ARRAY){
+        return calculateVarSize(var->u.array.elem)*var->u.array.size;
+    }
+    else{
+        if(strcmp(var->u.basic,"int")==0 || strcmp(var->u.basic,"float")==0){
+            return 4;
+        }
+        return findStructWithName(var->u.basic)->size;
+    }
 }

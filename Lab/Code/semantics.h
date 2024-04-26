@@ -3,7 +3,7 @@
 
 #include "ast.h"
 
-int StructTableUni=0; // for anonymous struct
+extern int StructTableUni; // for anonymous struct
 typedef struct Type_* Type;
 typedef struct FieldList_* FieldList;
 
@@ -53,6 +53,7 @@ struct TypeTable{
     char name[40]; 
     FieldList t; // struct content
     struct TypeTable*next;
+    int size;
 };
 
 /*num: error type, pos: error pos*/
@@ -91,5 +92,7 @@ struct TypeTable* findStructWithName(char*name);
 
 /*main function for semantic analysis*/
 void do_semantics(struct Tree* node);
+
+int calculateVarSize(Type var);
 
 #endif
