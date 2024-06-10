@@ -22,6 +22,6 @@ struct Tree
 
 struct Tree* root;
 struct Tree* newTreeNode(struct Tree* next, struct Tree* children, int pos, int type, char* value);
-
+void set_error();
 
 #endif

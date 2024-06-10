@@ -3,6 +3,8 @@
 #include"ir.h"
 #include<string.h>
 #include<stdio.h>
+#include<stdlib.h>
+
 extern FILE* output;
 static int tmp_num=1,label_num=1;
 void translate_Program(){
@@ -67,6 +69,11 @@ void translate_VarList(struct Tree* varlist){
 
 void translate_ParamDec(struct Tree* paramdec){
     struct Tree* vardec=paramdec->children->next;
+    if(vardec->children->next!=NULL){
+        printf("Cannot translate: \n");
+        set_error();
+        return;
+    }
     while(vardec->children->next!=NULL) vardec=vardec->children;
     fprintf(output,"PARAM %s\n",vardec->children->V.v_string);
 }
@@ -207,19 +214,11 @@ void translate_Exp(struct Tree* exp, char* place){
             }
         }
         else if(strcmp(exp->children->children->next->V.v_string,"LB")==0){
-            if(exp->children->exp_type->kind==BASIC ||
-                exp->children->exp_type->u.array.elem->kind!=ARRAY){
-                char* t1=newTemp(),*t2=newTemp();
-                translate_Exp(exp->children,t1);
-                translate_Exp(exp->children->next->next,t2);
-                fprintf(output,"%s := %s\n",t1,t2);
-                if(place!=NULL) fprintf(output,"%s := %s\n",place,t1);
-            }
-            else{
-                printf("Cannot translate: Code contains variables of multi-dimensional array type or parameters of array type.\n");
-                set_error();
-                return;
-            }
+            char* t1=newTemp(),*t2=newTemp();
+            translate_Exp(exp->children,t1);
+            translate_Exp(exp->children->next->next,t2);
+            fprintf(output,"%s := %s\n",t1,t2);
+            if(place!=NULL) fprintf(output,"%s := %s\n",place,t1);
         } 
         else{
             // Exp DOT ID ASSIGNOP Exp
@@ -274,7 +273,7 @@ void translate_Exp(struct Tree* exp, char* place){
     else if(strcmp(exp->children->next->V.v_string,"LB")==0){
         if(exp->children->children->next!=NULL && 
             exp->children->children->next->next!=NULL &&
-            strcmp(exp->children->children->next->next->V.v_string,"LB")==0){
+            strcmp(exp->children->children->next->V.v_string,"LB")==0){
                 printf("Cannot translate: Code contains variables of multi-dimensional array type or parameters of array type.\n");
                 set_error();
                 return;
@@ -379,6 +378,11 @@ void translate_Cond(struct Tree* exp, char* label_true, char* label_false){
 
 void translate_Args(struct Tree* args,arg_list al){
     char* t1=newTemp();
+    if(args->children->exp_type->kind==ARRAY){
+        printf("Cannot translate: \n");
+        set_error();
+        return;
+    }
     translate_Exp(args->children,t1);
     arg_list a=(arg_list)malloc(sizeof(struct args));
     if(strcmp(args->children->exp_type->u.basic,"int")==0){
@@ -418,4 +422,5 @@ int findOffset(Type t,char* name){
         f=f->tail;
     }
     printf("can't find struct!\n");
+    return 0;
 }

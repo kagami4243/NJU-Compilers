@@ -5,6 +5,9 @@
     #include "lex.yy.c"
     extern int isErrorAB, isPrintAB;
     void PrintTree(struct Tree* t, int num);
+    int yyerror(char* msg){
+        Print_B_Error();
+    }
 %}
 %union{
     struct Tree* type_Tree;
@@ -143,9 +146,6 @@ Args : Exp COMMA Args   { $$ = newTreeNode(NULL, $1, $1->pos, 0, "Args"); $1->ne
     ;
 
 %%
-yyerror(char* msg){
-    Print_B_Error();
-}
 
 void PrintTree(struct Tree* t, int num){
     if(t==NULL) return ;

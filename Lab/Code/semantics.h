@@ -17,6 +17,7 @@ struct symbol{
     struct symbol* next;
     char name[40];
     int param; // parameter or not
+    int offset;
 };
 
 struct Func{
@@ -97,5 +98,7 @@ void do_semantics(struct Tree* node);
 int calculateVarSize(Type var);
 
 void setParam(char* name);
+
+void semantics();
 
 #endif

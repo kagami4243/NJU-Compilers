@@ -12,6 +12,7 @@
     yylloc.last_column = yycolumn + yyleng - 1; \
     yycolumn += yyleng;
     void Print_A_Error();
+    void Print_B_Error();
     int isErrorAB = 0, isPrintAB = 1;
 %}
 %option yylineno

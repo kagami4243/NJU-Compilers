@@ -176,7 +176,7 @@ char* add2StructTable(struct Tree*structspecifier){
     }
     if((findSymbolWithName(Tag,0)!=NULL) || (findStructWithName(Tag)!=NULL)){
         PrintErrorNum(16,tag->pos);
-        return tag;
+        return Tag;
     }
     int size=0;
     struct Tree* deflist=tag->next->next;
@@ -196,7 +196,7 @@ char* add2StructTable(struct Tree*structspecifier){
                 unit->kind=BASIC;
                 strcpy(unit->u.basic,specifier->specifier);
                 strcpy(name,vardec->children->V.v_string);
-                if(strcmp(specifier,"int")==0 || strcmp(specifier,"float")==0){
+                if(strcmp(specifier->specifier,"int")==0 || strcmp(specifier->specifier,"float")==0){
                     size+=4;
                 }
                 else{
@@ -542,7 +542,7 @@ void do_semantics(struct Tree* node){
             if(strcmp(node->children->next->V.v_string,"SEMI")==0){
                 // ExtDef->Specifier SEMI
                 struct Tree* specifier=node->children;
-                do_semantics(node->children);
+                do_semantics(specifier);
             }
             else if(strcmp(node->children->next->V.v_string,"ExtDecList")==0){
                 // ExtDef->Specifier ExtDecList SEMI
@@ -678,7 +678,7 @@ void do_semantics(struct Tree* node){
                     PrintErrorNum(3,node->pos);
                     break;
                 }
-                else if(findStructWithName(id->V.v_string)!=NULL){
+                else if(tt!=NULL){
                     PrintErrorNum(3,node->pos);
                     break;
                 }

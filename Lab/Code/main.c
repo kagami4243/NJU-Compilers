@@ -1,6 +1,9 @@
 #include<stdio.h>
+#include"semantics.h"
+#include"ir.h"
+
 int error=0;
-FILE* output;
+FILE* output, *mips_out;
 int main(int argc, char** argv) {
     if (argc <= 1) return 1;
     FILE* f = fopen(argv[1], "rb");
@@ -8,19 +11,34 @@ int main(int argc, char** argv) {
         perror(argv[1]);
         return 1;
     }
-    output=fopen(argv[2],"w");
     yyrestart(f);
     yyparse();
+    if(argc==2) return 0;
     if(error==1) return 0;
     semantics();
     if(error==1) return 0;
-    translate_Program();
-    fclose(output);
-    if(error==1){
-        output=fopen(argv[2],"w");
+    if(argv[2][strlen(argv[2])-1]=='s'){
+        output=fopen("out.ir","w");
+        mips_out=fopen(argv[2],"w");
+        translate_Program();
         fclose(output);
+        if(error==1){
+            remove("out.ir");
+            return 0;
+        }
+    }
+    else{
+        output=fopen(argv[2],"w");
+        translate_Program();
+        fclose(output);
+        if(error==1){
+            remove(argv[2]);
+            return 0;
+        }
         return 0;
-    } 
+    }
+    mips(argv[2]);
+    remove("out.ir");
     return 0;
 }
 
