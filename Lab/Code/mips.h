@@ -1,14 +1,13 @@
 #ifndef MIPS_H
 #define MIPS_H
-#include<stdio.h>
-#include<string.h>
-#include<stdlib.h>
-#include<ctype.h>
-#include"semantics.h"
+
+void localVarRecord();
 void mips(char* filename);
-void printData(char* filename);
+void printData();
 void printGlobl();
 void printText(char* filename);
-int findStackOffset(char* name);   
+void pushLocalVarToStack(char* name);
+int calOffset(char* var);
+void loadToReg(char* var,char* reg);
 
 #endif

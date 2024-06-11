@@ -1,29 +1,29 @@
+#include<stdio.h>
+#include<string.h>
+#include<stdlib.h>
+#include"semantics.h"
 #include"mips.h"
 
 extern FILE* mips_out;
-static int argnum=0;
-static char args[100][100];
-struct{
+int argnum=0;
+char args[100][100];
+struct {
     int size;
     struct {
         char funcName[100];
-        char localName[10000][100];
+        char localName[5000][100];
         int localNum;
-        int localSize[10000];
-    }LV[1000];
+        int localSize[5000];
+    }LV[200];
 }localVar;
-static struct symbol* f;
-static int pa_index;
+struct symbol* f;
+int pa_index;
 
 void localVarRecord(){
     localVar.size=-1;
     FILE *file;
     char line[100]; 
     file = fopen("out.ir", "r");
-    if (file == NULL) {
-        printf("cannot open file: out.ir\n");
-        return 1;
-    }
     char f[100],pa[100][100];
     int pa_num,finish;
     while (fgets(line, sizeof(line), file)){
@@ -94,12 +94,12 @@ void localVarRecord(){
 
 void mips(char* filename){
     localVarRecord();
-    printData(filename);
+    printData();
     printGlobl();
     printText(filename);
 }
 
-void printData(char* filename){
+void printData(){
     fprintf(mips_out,".data\n");
     fprintf(mips_out,"_prompt: .asciiz \"Enter an integer:\"\n");
     fprintf(mips_out,"_ret: .asciiz \"\\n\"\n");
@@ -115,10 +115,6 @@ void printText(char* filename){
     FILE *file;
     char line[100]; 
     file = fopen("out.ir", "r");
-    if (file == NULL) {
-        printf("cannot open file: out.ir\n");
-        return 1;
-    }
     while (fgets(line, sizeof(line), file)) {
         if(strstr(line,"ARG")!=NULL){
             // ARG x

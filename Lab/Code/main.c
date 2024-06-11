@@ -1,4 +1,5 @@
 #include<stdio.h>
+#include<string.h>
 #include"semantics.h"
 #include"ir.h"
 #include"mips.h"
@@ -39,8 +40,8 @@ int main(int argc, char** argv) {
     }
     mips_out=fopen(argv[2],"w");
     mips(argv[2]);
-    remove("out.ir");
     fclose(mips_out);
+    remove("out.ir");
     return 0;
 }
 
