@@ -1,6 +1,7 @@
 #include<stdio.h>
 #include"semantics.h"
 #include"ir.h"
+#include"mips.h"
 
 int error=0;
 FILE* output, *mips_out;
@@ -19,7 +20,6 @@ int main(int argc, char** argv) {
     if(error==1) return 0;
     if(argv[2][strlen(argv[2])-1]=='s'){
         output=fopen("out.ir","w");
-        mips_out=fopen(argv[2],"w");
         translate_Program();
         fclose(output);
         if(error==1){
@@ -37,8 +37,10 @@ int main(int argc, char** argv) {
         }
         return 0;
     }
+    mips_out=fopen(argv[2],"w");
     mips(argv[2]);
     remove("out.ir");
+    fclose(mips_out);
     return 0;
 }
 

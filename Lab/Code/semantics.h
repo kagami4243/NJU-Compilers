@@ -17,7 +17,6 @@ struct symbol{
     struct symbol* next;
     char name[40];
     int param; // parameter or not
-    int offset;
 };
 
 struct Func{

@@ -1,7 +1,6 @@
 #include"mips.h"
 
 extern FILE* mips_out;
-extern struct symbol* symbolTable;
 static int argnum=0;
 static char args[100][100];
 struct{
@@ -300,150 +299,50 @@ void printText(char* filename){
         }
         else if(strstr(line,"+")!=NULL){
             // x = y + z
-            if(strstr(line,"#")!=NULL){
-                int index=strstr(line,"#")-line;
-                if(line[index-2]=='='){
-                    char x[100],y[100],k[100];
-                    int x_len=strstr(line,":=")-line-1,k_len=strstr(line,"+")-line-6-x_len,y_len=strlen(line)-x_len-y_len-9;
-                    strncpy(x,line,x_len);
-                    strncpy(k,line+x_len+5,k_len);
-                    strncpy(y,line+x_len+k_len+8,y_len);
-                    x[x_len]='\0';
-                    k[k_len]='\0';
-                    y[y_len]='\0';
-                    loadToReg(y,"$t0");
-                    fprintf(mips_out,"addi $t0, $t0, %d\n",atoi(k));
-                    fprintf(mips_out,"sw $t0, -%d($fp)\n",calOffset(x));
-                }
-                else{
-                    char x[100],y[100],k[100];
-                    int x_len=strstr(line,":=")-line-1,y_len=strstr(line,"+")-line-5-x_len,k_len=strlen(line)-x_len-y_len-9;
-                    strncpy(x,line,x_len);
-                    strncpy(y,line+x_len+4,y_len);
-                    strncpy(k,line+x_len+y_len+8,k_len);
-                    x[x_len]='\0';
-                    k[k_len]='\0';
-                    y[y_len]='\0';
-                    loadToReg(y,"$t0");
-                    fprintf(mips_out,"addi $t0, $t0, %d\n",atoi(k));
-                    fprintf(mips_out,"sw $t0, -%d($fp)\n",calOffset(x));
-                }
-            }
-            else{
-                char x[100],y[100],z[100];
-                int x_len=strstr(line,":=")-line-1,y_len=strstr(line,"+")-line-5-x_len,z_len=strlen(line)-x_len-y_len-8;
-                strncpy(x,line,x_len);
-                strncpy(y,line+x_len+4,y_len);
-                strncpy(z,line+x_len+y_len+7,z_len);
-                x[x_len]='\0';
-                y[y_len]='\0';
-                z[z_len]='\0';
-                loadToReg(y,"$t0");
-                loadToReg(z,"$t1");
-                fprintf(mips_out,"add $t0, $t0, $t1\n");
-                fprintf(mips_out,"sw $t0, -%d($fp)\n",calOffset(x));
-            }
+            char x[100],y[100],z[100];
+            int x_len=strstr(line,":=")-line-1,y_len=strstr(line,"+")-line-5-x_len,z_len=strlen(line)-x_len-y_len-8;
+            strncpy(x,line,x_len);
+            strncpy(y,line+x_len+4,y_len);
+            strncpy(z,line+x_len+y_len+7,z_len);
+            x[x_len]='\0';
+            y[y_len]='\0';
+            z[z_len]='\0';
+            loadToReg(y,"$t0");
+            loadToReg(z,"$t1");
+            fprintf(mips_out,"add $t0, $t0, $t1\n");
+            fprintf(mips_out,"sw $t0, -%d($fp)\n",calOffset(x));
         }
         else if(strstr(line,"-")!=NULL && line[strstr(line,"-")-line+1]==' '){
             // x = y - z
-            if(strstr(line,"#")!=NULL){
-                int index=strstr(line,"#")-line;
-                if(line[index-2]=='='){
-                    char x[100],y[100],k[100];
-                    int x_len=strstr(line,":=")-line-1,k_len=strstr(line,"-")-line-6-x_len,y_len=strlen(line)-x_len-k_len-9;
-                    strncpy(x,line,x_len);
-                    strncpy(k,line+x_len+5,k_len);
-                    strncpy(y,line+x_len+k_len+8,y_len);
-                    x[x_len]='\0';
-                    y[y_len]='\0';
-                    k[k_len]='\0';
-                    fprintf(mips_out,"li $t0, %d\n",atoi(k));
-                    loadToReg(y,"$t1");
-                    fprintf(mips_out,"sub $t0, $t0, $t1\n");
-                    fprintf(mips_out,"sw $t0, -%d($fp)\n",calOffset(x));
-                }
-                else{
-                    char x[100],y[100],k[100];
-                    int x_len=strstr(line,":=")-line-1,y_len=strstr(line,"-")-line-5-x_len,k_len=strlen(line)-x_len-y_len-9;
-                    strncpy(x,line,x_len);
-                    strncpy(y,line+x_len+4,y_len);
-                    strncpy(k,line+x_len+y_len+8,k_len);
-                    x[x_len]='\0';
-                    y[y_len]='\0';
-                    k[k_len]='\0';
-                    loadToReg(y,"$t0");
-                    fprintf(mips_out,"addi $t0, $t0, %d\n",atoi(k));
-                    fprintf(mips_out,"sw $t0, -%d($fp)\n",calOffset(x));
-                }
-            }
-            else{
-                char x[100],y[100],z[100];
-                int x_len=strstr(line,":=")-line-1,y_len=strstr(line,"-")-line-5-x_len,z_len=strlen(line)-x_len-y_len-8;
-                strncpy(x,line,x_len);
-                strncpy(y,line+x_len+4,y_len);
-                strncpy(z,line+x_len+y_len+7,z_len);
-                x[x_len]='\0';
-                y[y_len]='\0';
-                z[z_len]='\0';
-                loadToReg(y,"$t0");
-                loadToReg(z,"$t1");
-                fprintf(mips_out,"sub $t0, $t0, $t1\n");
-                fprintf(mips_out,"sw $t0, -%d($fp)\n",calOffset(x));
-            }
+            char x[100],y[100],z[100];
+            int x_len=strstr(line,":=")-line-1,y_len=strstr(line,"-")-line-5-x_len,z_len=strlen(line)-x_len-y_len-8;
+            strncpy(x,line,x_len);
+            strncpy(y,line+x_len+4,y_len);
+            strncpy(z,line+x_len+y_len+7,z_len);
+            x[x_len]='\0';
+            y[y_len]='\0';
+            z[z_len]='\0';
+            loadToReg(y,"$t0");
+            loadToReg(z,"$t1");
+            fprintf(mips_out,"sub $t0, $t0, $t1\n");
+            fprintf(mips_out,"sw $t0, -%d($fp)\n",calOffset(x));
         }
         else if(strstr(line,"/")!=NULL){
             // x = y / z
-            if(strstr(line,"#")!=NULL){
-                int index=strstr(line,"#")-line;
-                if(line[index-2]=='='){
-                    char x[100],y[100],k[100];
-                    int x_len=strstr(line,":=")-line-1,k_len=strstr(line,"/")-line-6-x_len,y_len=strlen(line)-x_len-k_len-9;
-                    strncpy(x,line,x_len);
-                    strncpy(k,line+x_len+5,k_len);
-                    strncpy(y,line+x_len+k_len+8,y_len);
-                    x[x_len]='\0';
-                    y[y_len]='\0';
-                    k[k_len]='\0';
-                    fprintf(mips_out,"li $t0, %d\n",atoi(k));
-                    loadToReg(y,"$t1");
-                    loadToReg(x,"$t2");
-                    fprintf(mips_out,"div $t0, $t1\n");
-                    fprintf(mips_out,"mflo $t2\n");
-                    fprintf(mips_out,"sw $t2, -%d($fp)\n",calOffset(x));
-                }
-                else{
-                    char x[100],y[100],z[100];
-                    int x_len=strstr(line,":=")-line-1,y_len=strstr(line,"/")-line-5-x_len,z_len=strlen(line)-x_len-y_len-9;
-                    strncpy(x,line,x_len);
-                    strncpy(y,line+x_len+4,y_len);
-                    strncpy(z,line+x_len+y_len+8,z_len);
-                    x[x_len]='\0';
-                    y[y_len]='\0';
-                    z[z_len]='\0';
-                    loadToReg(y,"$t0");
-                    fprintf(mips_out,"li $t1, %d\n",atoi(z));
-                    loadToReg(x,"$t2");
-                    fprintf(mips_out,"div $t0, $t1\n");
-                    fprintf(mips_out,"mflo $t2\n");
-                    fprintf(mips_out,"sw $t2, -%d($fp)\n",calOffset(x));
-                }
-            }
-            else{
-                char x[100],y[100],z[100];
-                int x_len=strstr(line,":=")-line-1,y_len=strstr(line,"/")-line-5-x_len,z_len=strlen(line)-x_len-y_len-8;
-                strncpy(x,line,x_len);
-                strncpy(y,line+x_len+4,y_len);
-                strncpy(z,line+x_len+y_len+7,z_len);
-                x[x_len]='\0';
-                y[y_len]='\0';
-                z[z_len]='\0';
-                loadToReg(y,"$t0");
-                loadToReg(z,"$t1");
-                loadToReg(x,"$t2");
-                fprintf(mips_out,"div $t0, $t1\n");
-                fprintf(mips_out,"mflo $t2\n");
-                fprintf(mips_out,"sw $t2, -%d($fp)\n",calOffset(x));
-            }
+            char x[100],y[100],z[100];
+            int x_len=strstr(line,":=")-line-1,y_len=strstr(line,"/")-line-5-x_len,z_len=strlen(line)-x_len-y_len-8;
+            strncpy(x,line,x_len);
+            strncpy(y,line+x_len+4,y_len);
+            strncpy(z,line+x_len+y_len+7,z_len);
+            x[x_len]='\0';
+            y[y_len]='\0';
+            z[z_len]='\0';
+            loadToReg(y,"$t0");
+            loadToReg(z,"$t1");
+            loadToReg(x,"$t2");
+            fprintf(mips_out,"div $t0, $t1\n");
+            fprintf(mips_out,"mflo $t2\n");
+            fprintf(mips_out,"sw $t2, -%d($fp)\n",calOffset(x));
         }
         else if(strstr(line,"&")!=NULL){
             // X = &y
@@ -457,10 +356,9 @@ void printText(char* filename){
             fprintf(mips_out,"sw $t0, -%d($fp)\n",calOffset(x));
         }
         else if(strstr(line,"*")!=NULL){
-            int index=strstr(line,"*")-line,index2=-1,index3=-1;
+            int index=strstr(line,"*")-line,index2=-1;
             if(strstr(line+index+1,"*")!=NULL) index2=strstr(line+index+1,"*")-line;
-            if(index2!=-1 && strstr(line+index2+1,"*")!=NULL) index3=strstr(line+index2+1,"*")-line;
-            if(index==0 && (index2==-1||index3==-1)){
+            if(index==0){
                 // *x = y
                 char x[100],y[100];
                 int x_len=strstr(line,":=")-line-2,y_len=strlen(line)-x_len-6;
@@ -480,90 +378,37 @@ void printText(char* filename){
                 strncpy(y,line+x_len+5,y_len);
                 x[x_len]='\0';
                 y[y_len]='\0';
-                fprintf(mips_out,"lw $t1, -%d($fp)\n",calOffset(y));
+                loadToReg(y,"$t1");
                 fprintf(mips_out,"lw $t0, 0($t1)\n");
                 fprintf(mips_out,"sw $t0, -%d($fp)\n",calOffset(x));
             }
             else{
                 // x = y * z
-                if(strstr(line,"#")!=NULL){
-                    int index=strstr(line,"#")-line;
-                    if(line[index-2]=='='){
-                        char x[100],y[100],z[100];
-                        int x_len=strstr(line,":=")-line-1,z_len=strstr(line,"*")-line-6-x_len,y_len=strlen(line)-x_len-y_len-9;
-                        strncpy(x,line,x_len);
-                        strncpy(z,line+x_len+5,z_len);
-                        strncpy(y,line+x_len+z_len+8,y_len);
-                        x[x_len]='\0';
-                        y[y_len]='\0';
-                        z[z_len]='\0';
-                        loadToReg(y,"$t0");
-                        fprintf(mips_out,"li $t1, %d\n",atoi(z));
-                        fprintf(mips_out,"mul $t0, $t0, $t1\n");
-                        fprintf(mips_out,"sw $t0, -%d($fp)\n",calOffset(x));
-                    }
-                    else{
-                        char x[100],y[100],z[100];
-                        int x_len=strstr(line,":=")-line-1,y_len=strstr(line+x_len+5,"*")-line-5-x_len,z_len=strlen(line)-x_len-y_len-9;
-                        strncpy(x,line,x_len);
-                        strncpy(y,line+x_len+4,y_len);
-                        strncpy(z,line+x_len+y_len+8,z_len);
-                        x[x_len]='\0';
-                        y[y_len]='\0';
-                        z[z_len]='\0';
-                        loadToReg(y,"$t0");
-                        fprintf(mips_out,"li $t1, %d\n",atoi(z));
-                        fprintf(mips_out,"mul $t0, $t0, $t1\n");
-                        fprintf(mips_out,"sw $t0, -%d($fp)\n",calOffset(x));
-                    }
-                }
-                else{
-                    char x[100],y[100],z[100];
-                    int x_len=strstr(line,":=")-line-1,y_len=strstr(line+x_len+5,"*")-line-5-x_len,z_len=strlen(line)-x_len-y_len-8;
-                    strncpy(x,line,x_len);
-                    strncpy(y,line+x_len+4,y_len);
-                    strncpy(z,line+x_len+y_len+7,z_len);
-                    x[x_len]='\0';
-                    y[y_len]='\0';
-                    z[z_len]='\0';
-                    loadToReg(y,"$t0");
-                    loadToReg(z,"$t1");
-                    fprintf(mips_out,"mul $t0, $t0, $t1\n");
-                    fprintf(mips_out,"sw $t0, -%d($fp)\n",calOffset(x));
-                }
+                char x[100],y[100],z[100];
+                int x_len=strstr(line,":=")-line-1,y_len=strstr(line+x_len+5,"*")-line-5-x_len,z_len=strlen(line)-x_len-y_len-8;
+                strncpy(x,line,x_len);
+                strncpy(y,line+x_len+4,y_len);
+                strncpy(z,line+x_len+y_len+7,z_len);
+                x[x_len]='\0';
+                y[y_len]='\0';
+                z[z_len]='\0';
+                loadToReg(y,"$t0");
+                loadToReg(z,"$t1");
+                fprintf(mips_out,"mul $t0, $t0, $t1\n");
+                fprintf(mips_out,"sw $t0, -%d($fp)\n",calOffset(x));
             }
         }
         else if(strstr(line,":=")!=NULL){
-            if(strstr(line,"#")!=NULL){
-                // x = #k
-                char x[100],k[100];
-                int x_len=strstr(line,":=")-line-1,k_len=strlen(line)-x_len-6;
-                strncpy(x,line,x_len);
-                strncpy(k,line+x_len+5,k_len);
-                x[x_len]='\0';
-                k[k_len]='\0';
-                fprintf(mips_out,"li $t0, %d\n",atoi(k));
-                fprintf(mips_out,"sw $t0, -%d($fp)\n",calOffset(x));
-
-            }
-            else{
-                // x = y
-                char x[100],y[100];
-                int x_len=strstr(line,":=")-line-1,y_len=strlen(line)-x_len-5;
-                strncpy(x,line,x_len);x[x_len]='\0';
-                strncpy(y,line+x_len+4,y_len);y[y_len]='\0';
-                loadToReg(y,"$t0");
-                fprintf(mips_out,"sw $t0, -%d($fp)\n",calOffset(x));
-            }
+            // x = y
+            char x[100],y[100];
+            int x_len=strstr(line,":=")-line-1,y_len=strlen(line)-x_len-5;
+            strncpy(x,line,x_len);x[x_len]='\0';
+            strncpy(y,line+x_len+4,y_len);y[y_len]='\0';
+            loadToReg(y,"$t0");
+            fprintf(mips_out,"sw $t0, -%d($fp)\n",calOffset(x));
         }
     }
     fclose(file);
-}
-
-int findStackOffset(char* name){
-    struct symbol*s=symbolTable->next;
-    while(strcmp(name,s->name)!=0) s=s->next;
-    return s->offset;
 }
 
 void pushLocalVarToStack(char* name){
